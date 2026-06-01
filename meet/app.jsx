@@ -1,17 +1,25 @@
 /* app.jsx — shell, routing, topbar. PHP API-backed version. */
 const { useState: useSt, useEffect: useEf } = React;
 
+/* ── Permission helpers ──────────────────────────────────── */
+const isAdmin     = (auth) => auth?.permission === 'admin';
+const canManage   = (auth) => auth?.permission === 'admin' || auth?.permission === 'organizer';
+
 /* ── Topbar ──────────────────────────────────────────────── */
 function Topbar({ auth, view, go, onLogout }) {
   const now = useNow(1000);
+  const p   = auth?.permission;
+
   const navItems = [
     ["agenda",    "วาระวันนี้",    IcoCalendar],
-    ["dashboard", "จัดการประชุม", IcoList],
+    ...(canManage(auth) ? [["dashboard", "จัดการประชุม", IcoList]] : []),
     ["calendar",  "ปฏิทิน",       IcoGrid],
+    ...(isAdmin(auth)   ? [["users",     "จัดการผู้ใช้",  IcoUsers]] : []),
   ];
+
   return (
     <div className="topbar">
-      <div className="brand" onClick={() => go(auth ? "dashboard" : "agenda")}>
+      <div className="brand" onClick={() => go(canManage(auth) ? "dashboard" : "agenda")}>
         <span style={{ width:38, height:38, borderRadius:11, background:"var(--blue)",
           display:"inline-flex", alignItems:"center", justifyContent:"center" }}>
           <IcoVideo size={21} stroke="#fff" />
@@ -43,7 +51,9 @@ function Topbar({ auth, view, go, onLogout }) {
         <div className="row" style={{ gap:10, marginLeft:8 }}>
           <div style={{ textAlign:"right", lineHeight:1.2 }}>
             <div style={{ fontSize:13.5, fontWeight:600 }}>{auth.name}</div>
-            <div style={{ fontSize:11.5, color:"var(--muted)" }}>{auth.role}</div>
+            <div style={{ fontSize:11.5, color:"var(--muted)" }}>
+              {PERM_LABEL[auth.permission] ?? auth.role}
+            </div>
           </div>
           <Avatar name={auth.name} />
           <button className="icon-btn" title="ออกจากระบบ" onClick={onLogout}>
@@ -75,7 +85,7 @@ function LoadingScreen() {
   );
 }
 
-/* ── Error screen (DB not configured) ───────────────────── */
+/* ── Error screen ────────────────────────────────────────── */
 function ErrorScreen({ message }) {
   return (
     <div style={{ display:"flex", alignItems:"center", justifyContent:"center",
@@ -118,7 +128,7 @@ function App() {
       fetch("api/meetings.php", { credentials:"same-origin" }).then(r => r.json()),
     ])
       .then(([authRes, meetRes]) => {
-        if (authRes.success  && authRes.data.user) setAuth(authRes.data.user);
+        if (authRes.success && authRes.data.user) setAuth(authRes.data.user);
         if (meetRes.success) setMeetings(meetRes.data);
         else setApiError("โหลดข้อมูลไม่ได้: " + (meetRes.error ?? ""));
       })
@@ -134,7 +144,8 @@ function App() {
   /* ── Auth ── */
   const doLogin = (user) => {
     setAuth(user);
-    go("dashboard");
+    // staff lands on agenda (ไม่มี dashboard), others go to dashboard
+    go(user.permission === 'staff' ? "agenda" : "dashboard");
     showToast("เข้าสู่ระบบสำเร็จ");
   };
 
@@ -149,7 +160,7 @@ function App() {
   const startNew   = ()  => { setEditing(null); go("form"); };
   const startEdit  = (m) => { setEditing(m); go("form"); };
 
-  /* ── CRUD ── */
+  /* ── Meeting CRUD ── */
   const saveMeeting = async (m) => {
     const isEdit = editing !== null;
     const url    = isEdit ? `api/meetings.php?id=${encodeURIComponent(m.id)}` : "api/meetings.php";
@@ -194,7 +205,7 @@ function App() {
         setMeetings(prev => prev.filter(x => x.id !== target.id));
         if (selected?.id === target.id) setSelected(null);
         showToast("ลบการประชุมแล้ว");
-        if (view === "detail") go(auth ? "dashboard" : "agenda");
+        if (view === "detail") go(canManage(auth) ? "dashboard" : "agenda");
       } else {
         showToast("เกิดข้อผิดพลาด: " + (data.error ?? ""));
       }
@@ -203,12 +214,20 @@ function App() {
     }
   };
 
-  /* Guard admin views when not logged in */
+  /* ── Route guards ── */
   useEf(() => {
-    if (!auth && ["dashboard","calendar","form"].includes(view)) go("login");
+    if (!auth) {
+      // ต้อง login ก่อนเข้า admin views
+      if (["dashboard","calendar","form","users"].includes(view)) go("login");
+    } else if (auth.permission === 'staff') {
+      // staff เข้า management pages ไม่ได้
+      if (["dashboard","form","users"].includes(view)) go("agenda");
+    } else if (!isAdmin(auth)) {
+      // organizer เข้าหน้า users ไม่ได้
+      if (view === "users") go("dashboard");
+    }
   }, [auth, view]);
 
-  /* Keep selected fresh when a meeting is edited */
   const liveSelected = selected
     ? (meetings.find(m => m.id === selected.id) || selected)
     : null;
@@ -225,10 +244,11 @@ function App() {
 
       {view === "agenda"    && <PublicAgenda meetings={meetings} auth={auth} onOpen={openDetail} onGoLogin={() => go("login")} />}
       {view === "login"     && <Login onLogin={doLogin} onBack={() => go("agenda")} />}
-      {view === "dashboard" && auth && <Dashboard meetings={meetings} auth={auth} onOpen={openDetail} onNew={startNew} onEdit={startEdit} onDelete={askDelete} />}
-      {view === "calendar"  && auth && <Calendar  meetings={meetings} onOpen={openDetail} />}
-      {view === "form"      && auth && <MeetingForm initial={editing} onSave={saveMeeting} onCancel={() => go("dashboard")} />}
-      {view === "detail"    && <MeetingDetail meeting={liveSelected} auth={auth} onBack={() => go(auth ? "dashboard" : "agenda")} admin={!!auth} onEdit={startEdit} onDelete={askDelete} onGoLogin={() => go("login")} />}
+      {view === "dashboard" && canManage(auth) && <Dashboard meetings={meetings} auth={auth} onOpen={openDetail} onNew={startNew} onEdit={startEdit} onDelete={askDelete} />}
+      {view === "calendar"  && auth && <Calendar meetings={meetings} onOpen={openDetail} />}
+      {view === "form"      && canManage(auth) && <MeetingForm initial={editing} onSave={saveMeeting} onCancel={() => go("dashboard")} />}
+      {view === "detail"    && <MeetingDetail meeting={liveSelected} auth={auth} onBack={() => go(canManage(auth) ? "dashboard" : "agenda")} admin={canManage(auth)} onEdit={startEdit} onDelete={askDelete} onGoLogin={() => go("login")} />}
+      {view === "users"     && isAdmin(auth) && <UserManagement currentUser={auth} />}
 
       {confirm && (
         <ConfirmModal

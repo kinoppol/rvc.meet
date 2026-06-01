@@ -78,6 +78,18 @@ function requireAuth(): void
     }
 }
 
+/** Require login AND one of the given permission levels */
+function requireRole(array $roles): void
+{
+    if (empty($_SESSION['user'])) {
+        jsonError('Unauthorized – please log in', 401);
+    }
+    $perm = $_SESSION['user']['permission'] ?? 'staff';
+    if (!in_array($perm, $roles, true)) {
+        jsonError('Forbidden – insufficient permissions', 403);
+    }
+}
+
 /* ── Data helpers ────────────────────────────────────────────────── */
 
 /** Convert any ISO-8601 / datetime string → UTC 'Y-m-d H:i:s' for storage */

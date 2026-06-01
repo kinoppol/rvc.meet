@@ -29,11 +29,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $canInstall) {
         'user' => trim($_POST['db_user'] ?? 'root'),
         'pass' => $_POST['db_pass']      ?? '',
     ];
+    $admPerm = $_POST['adm_permission'] ?? 'admin';
+    if (!in_array($admPerm, ['admin','organizer','staff'], true)) $admPerm = 'admin';
     $adm = [
-        'username' => trim($_POST['adm_user'] ?? 'admin'),
-        'password' => $_POST['adm_pass']      ?? '1234',
-        'name'     => trim($_POST['adm_name'] ?? 'ผู้ดูแลระบบประชุม'),
-        'role'     => trim($_POST['adm_role'] ?? 'เจ้าหน้าที่งานสารสนเทศ'),
+        'username'   => trim($_POST['adm_user'] ?? 'admin'),
+        'password'   => $_POST['adm_pass']      ?? '1234',
+        'name'       => trim($_POST['adm_name'] ?? 'ผู้ดูแลระบบประชุม'),
+        'role'       => trim($_POST['adm_role'] ?? 'เจ้าหน้าที่งานสารสนเทศ'),
+        'permission' => $admPerm,
     ];
 
     try {
@@ -58,10 +61,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $canInstall) {
             `password_hash` VARCHAR(255)  NOT NULL,
             `name`          VARCHAR(200)  NOT NULL,
             `role`          VARCHAR(100)  NOT NULL DEFAULT '',
+            `permission`    VARCHAR(20)   NOT NULL DEFAULT 'staff',
             `created_at`    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
             UNIQUE KEY `uq_username` (`username`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        /* Upgrade: add permission column to existing installations */
+        $pdo->exec("ALTER TABLE `users`
+            ADD COLUMN IF NOT EXISTS `permission` VARCHAR(20) NOT NULL DEFAULT 'staff' AFTER `role`");
 
         $pdo->exec("CREATE TABLE IF NOT EXISTS `meetings` (
             `id`          VARCHAR(20)   NOT NULL,
@@ -97,9 +105,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $canInstall) {
         /* 4. Admin user */
         $hash = password_hash($adm['password'], PASSWORD_BCRYPT, ['cost' => 12]);
         $pdo->prepare(
-            "INSERT INTO users (username, password_hash, name, role) VALUES (?,?,?,?)
-             ON DUPLICATE KEY UPDATE password_hash=VALUES(password_hash), name=VALUES(name), role=VALUES(role)"
-        )->execute([$adm['username'], $hash, $adm['name'], $adm['role']]);
+            "INSERT INTO users (username, password_hash, name, role, permission) VALUES (?,?,?,?,?)
+             ON DUPLICATE KEY UPDATE
+                password_hash=VALUES(password_hash),
+                name=VALUES(name),
+                role=VALUES(role),
+                permission=VALUES(permission)"
+        )->execute([$adm['username'], $hash, $adm['name'], $adm['role'], $adm['permission']]);
 
         /* 5. Seed data (relative to NOW() so statuses are immediately visible) */
         installSeed($pdo);
@@ -412,6 +424,18 @@ function installSeed(PDO $pdo): void
         <div class="field">
           <label>ตำแหน่ง / ฝ่ายงาน</label>
           <input class="input" name="adm_role" value="<?= htmlspecialchars($_POST['adm_role'] ?? 'เจ้าหน้าที่งานสารสนเทศ') ?>" />
+        </div>
+        <div class="field">
+          <label>ประเภทผู้ใช้ <span class="req">*</span></label>
+          <select class="select" name="adm_permission">
+            <?php
+            $selPerm = $_POST['adm_permission'] ?? 'admin';
+            foreach (['admin'=>'ผู้ดูแลระบบ','organizer'=>'ผู้กำหนดการประชุม','staff'=>'บุคลากรทั่วไป'] as $val=>$lbl):
+            ?>
+            <option value="<?= $val ?>"<?= $selPerm===$val?' selected':'' ?>><?= $lbl ?></option>
+            <?php endforeach; ?>
+          </select>
+          <span class="hint">ผู้ดูแลระบบ: จัดการผู้ใช้ + ประชุม · ผู้กำหนดการประชุม: จัดการประชุม · บุคลากรทั่วไป: เข้าร่วมเท่านั้น</span>
         </div>
       </div>
     </div>

@@ -33,7 +33,7 @@ function handleLogin(): never
     try {
         $db   = getDB();
         $stmt = $db->prepare(
-            'SELECT id, username, password_hash, name, role FROM users WHERE username = ? LIMIT 1'
+            'SELECT id, username, password_hash, name, role, permission FROM users WHERE username = ? LIMIT 1'
         );
         $stmt->execute([$username]);
         $user = $stmt->fetch();
@@ -41,10 +41,11 @@ function handleLogin(): never
         if ($user && password_verify($password, $user['password_hash'])) {
             session_regenerate_id(true);
             $_SESSION['user'] = [
-                'id'       => $user['id'],
-                'username' => $user['username'],
-                'name'     => $user['name'],
-                'role'     => $user['role'],
+                'id'         => $user['id'],
+                'username'   => $user['username'],
+                'name'       => $user['name'],
+                'role'       => $user['role'],
+                'permission' => $user['permission'] ?? 'staff',
             ];
             jsonOk(['user' => $_SESSION['user']]);
         }

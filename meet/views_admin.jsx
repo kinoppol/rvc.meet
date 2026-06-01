@@ -1,5 +1,13 @@
-/* views_admin.jsx — login, dashboard (manage), form, calendar. Exports to window. */
+/* views_admin.jsx — login, dashboard (manage), form, calendar, user management. Exports to window. */
 const { useState: useS, useMemo: useM, useEffect: useE } = React;
+
+/* ── Permission meta ─────────────────────────────────────── */
+const PERM_META = {
+  admin:     { label:"ผู้ดูแลระบบ",          color:"var(--red)",    bg:"var(--red-50)"    },
+  organizer: { label:"ผู้กำหนดการประชุม",    color:"var(--purple)", bg:"var(--purple-50)" },
+  staff:     { label:"บุคลากรทั่วไป",         color:"var(--muted)",  bg:"var(--bg-2)"      },
+};
+const PERM_LABEL = { admin:"ผู้ดูแลระบบ", organizer:"ผู้กำหนดการประชุม", staff:"บุคลากรทั่วไป" };
 
 /* ===================== LOGIN ===================== */
 function Login({ onLogin, onBack }) {
@@ -532,4 +540,271 @@ function startOfWeek(d)  { const x = new Date(d); x.setDate(x.getDate()-x.getDay
 function addDays(d, n)   { const x = new Date(d); x.setDate(x.getDate()+n); return x; }
 function addMonths(d, n) { const x = new Date(d); x.setMonth(x.getMonth()+n); return x; }
 
-Object.assign(window, { Login, Dashboard, MeetingForm, Calendar });
+/* ===================== USER MANAGEMENT ===================== */
+function UserManagement({ currentUser }) {
+  const [users,   setUsers]   = useS([]);
+  const [loading, setLoading] = useS(true);
+  const [modal,   setModal]   = useS(null);   // null | {mode:'create'} | {mode:'edit',user:{}}
+  const [delUser, setDelUser] = useS(null);
+  const [toast,   setToast]   = useS("");
+  const [q,       setQ]       = useS("");
+
+  useE(() => {
+    fetch("api/users.php", { credentials:"same-origin" })
+      .then(r => r.json())
+      .then(d => { if (d.success) setUsers(d.data); })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filtered = users.filter(u =>
+    q === "" || (u.name + u.username + u.role + PERM_LABEL[u.permission])
+      .toLowerCase().includes(q.toLowerCase())
+  );
+
+  const saveUser = async (payload, userId) => {
+    const isEdit = !!userId;
+    const res  = await fetch(
+      isEdit ? `api/users.php?id=${userId}` : "api/users.php",
+      { method: isEdit ? "PUT" : "POST",
+        headers: { "Content-Type":"application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify(payload) }
+    );
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error ?? "เกิดข้อผิดพลาด");
+    setUsers(prev =>
+      isEdit ? prev.map(u => u.id === userId ? data.data : u) : [...prev, data.data]
+    );
+    setModal(null);
+    setToast(isEdit ? "แก้ไขข้อมูลผู้ใช้แล้ว" : "เพิ่มผู้ใช้ใหม่แล้ว");
+  };
+
+  const confirmDelete = async () => {
+    const target = delUser;
+    setDelUser(null);
+    const res  = await fetch(`api/users.php?id=${target.id}`, {
+      method: "DELETE", credentials: "same-origin"
+    });
+    const data = await res.json();
+    if (data.success) {
+      setUsers(prev => prev.filter(u => u.id !== target.id));
+      setToast("ลบผู้ใช้แล้ว");
+    } else {
+      setToast("เกิดข้อผิดพลาด: " + (data.error ?? ""));
+    }
+  };
+
+  return (
+    <div className="page page-wide">
+      {/* Header */}
+      <div className="page-head wrap" style={{ justifyContent:"space-between" }}>
+        <div>
+          <div className="h-title">จัดการผู้ใช้</div>
+          <div className="h-sub">บัญชีผู้ใช้ทั้งหมด {users.length} บัญชี</div>
+        </div>
+        <button className="btn btn-primary btn-lg"
+          onClick={() => setModal({ mode:"create" })}>
+          <IcoPlus size={19} stroke="#fff" /> เพิ่มผู้ใช้
+        </button>
+      </div>
+
+      {/* Role legend */}
+      <div className="row wrap" style={{ gap:10, marginBottom:20 }}>
+        {Object.entries(PERM_META).map(([k, v]) => (
+          <span key={k} className="chip" style={{ background:v.bg, color:v.color }}>
+            {v.label}
+            <span style={{ fontWeight:400, opacity:.75, marginLeft:4, fontSize:11.5 }}>
+              {k==="admin"?"จัดการผู้ใช้+ประชุม":k==="organizer"?"จัดการประชุม":"เข้าร่วมเท่านั้น"}
+            </span>
+          </span>
+        ))}
+      </div>
+
+      {/* Search */}
+      <div style={{ marginBottom:16 }}>
+        <div className="search" style={{ maxWidth:340 }}>
+          <IcoSearch />
+          <input value={q} onChange={e => setQ(e.target.value)}
+            placeholder="ค้นหาชื่อ ชื่อผู้ใช้ หรือตำแหน่ง…" />
+          {q && <button className="icon-btn" style={{ width:28, height:28 }} onClick={() => setQ("")}><IcoX size={15} /></button>}
+        </div>
+      </div>
+
+      {/* User list */}
+      {loading ? (
+        <div className="empty"><div>กำลังโหลด…</div></div>
+      ) : filtered.length === 0 ? (
+        <EmptyState icon={IcoUsers} title="ไม่พบผู้ใช้" text="ลองปรับคำค้นหา หรือเพิ่มผู้ใช้ใหม่" />
+      ) : (
+        <div className="card" style={{ overflow:"hidden" }}>
+          {filtered.map((u, i) => {
+            const pm    = PERM_META[u.permission] || PERM_META.staff;
+            const isSelf = u.id === currentUser.id;
+            return (
+              <div key={u.id} style={{
+                display:"flex", alignItems:"center", gap:14,
+                padding:"14px 20px",
+                borderBottom: i < filtered.length-1 ? "1px solid var(--line)" : "none",
+              }}>
+                <Avatar name={u.name} />
+                <div className="grow">
+                  <div style={{ fontWeight:600, fontSize:15.5 }}>
+                    {u.name}
+                    {isSelf && <span style={{ fontSize:11.5, color:"var(--muted)", marginLeft:8 }}>(คุณ)</span>}
+                  </div>
+                  <div style={{ fontSize:13, color:"var(--muted)", marginTop:2 }}>
+                    @{u.username}{u.role ? ` · ${u.role}` : ""}
+                  </div>
+                </div>
+                <span className="chip" style={{ background:pm.bg, color:pm.color }}>
+                  {pm.label}
+                </span>
+                <button className="icon-btn" title="แก้ไข"
+                  onClick={() => setModal({ mode:"edit", user:u })}>
+                  <IcoEdit size={18} />
+                </button>
+                <button className="icon-btn" title={isSelf ? "ไม่สามารถลบตัวเองได้" : "ลบ"}
+                  style={{ opacity: isSelf ? .3 : 1, cursor: isSelf ? "not-allowed":"pointer" }}
+                  onClick={() => !isSelf && setDelUser(u)}>
+                  <IcoTrash size={18} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {modal && (
+        <UserModal
+          mode={modal.mode} user={modal.user}
+          currentUser={currentUser}
+          onSave={saveUser}
+          onClose={() => setModal(null)}
+        />
+      )}
+
+      {delUser && (
+        <ConfirmModal
+          title="ยืนยันการลบผู้ใช้"
+          body={`ต้องการลบบัญชี "${delUser.name}" (@${delUser.username}) ออกจากระบบหรือไม่?`}
+          confirmLabel="ลบผู้ใช้" danger
+          onConfirm={confirmDelete}
+          onCancel={() => setDelUser(null)}
+        />
+      )}
+
+      <Toast msg={toast} onDone={() => setToast("")} />
+    </div>
+  );
+}
+
+/* ── User create/edit modal ─────────────────────────────── */
+function UserModal({ mode, user, currentUser, onSave, onClose }) {
+  const isEdit = mode === "edit";
+  const isSelf = isEdit && user?.id === currentUser.id;
+
+  const [f,    setF]    = useS({
+    name:       user?.name       ?? "",
+    username:   user?.username   ?? "",
+    password:   "",
+    role:       user?.role       ?? "",
+    permission: user?.permission ?? "staff",
+  });
+  const [err,  setErr]  = useS("");
+  const [busy, setBusy] = useS(false);
+  const set = (k, v) => setF(prev => ({ ...prev, [k]: v }));
+
+  const submit = async () => {
+    if (!f.name.trim())                  { setErr("กรุณาระบุชื่อแสดง"); return; }
+    if (!isEdit && !f.username.trim())   { setErr("กรุณาระบุชื่อผู้ใช้"); return; }
+    if (!isEdit && !f.password)          { setErr("กรุณาระบุรหัสผ่าน"); return; }
+    setBusy(true); setErr("");
+    try {
+      const payload = {
+        name:       f.name.trim(),
+        username:   f.username.trim(),
+        role:       f.role.trim(),
+        permission: f.permission,
+        ...(f.password ? { password: f.password } : {}),
+      };
+      await onSave(payload, isEdit ? user.id : null);
+    } catch (e) {
+      setErr(e.message);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="modal-bg" onClick={onClose}>
+      <div className="modal" style={{ maxWidth:460 }} onClick={e => e.stopPropagation()}>
+        <h3 style={{ margin:"0 0 20px", fontSize:21 }}>
+          {isEdit ? "แก้ไขข้อมูลผู้ใช้" : "เพิ่มผู้ใช้ใหม่"}
+        </h3>
+
+        <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+          <div className="field">
+            <label>ชื่อแสดง <span className="req">*</span></label>
+            <input className="input" value={f.name}
+              onChange={e => set("name", e.target.value)} placeholder="ชื่อ-นามสกุล" />
+          </div>
+
+          <div className="field">
+            <label>ชื่อผู้ใช้ (Username) {!isEdit && <span className="req">*</span>}</label>
+            <input className="input" value={f.username} disabled={isEdit}
+              onChange={e => set("username", e.target.value)}
+              placeholder="ชื่อผู้ใช้สำหรับ login" autoComplete="off" />
+            {isEdit && <span className="hint">ไม่สามารถเปลี่ยนชื่อผู้ใช้ได้</span>}
+          </div>
+
+          <div className="field">
+            <label>
+              {isEdit ? "รหัสผ่านใหม่" : <>รหัสผ่าน <span className="req">*</span></>}
+            </label>
+            <input className="input" type="password" value={f.password}
+              onChange={e => set("password", e.target.value)}
+              placeholder={isEdit ? "เว้นว่างถ้าไม่ต้องการเปลี่ยน" : "รหัสผ่าน"}
+              autoComplete="new-password" />
+          </div>
+
+          <div className="field">
+            <label>ตำแหน่ง / ฝ่ายงาน</label>
+            <input className="input" value={f.role}
+              onChange={e => set("role", e.target.value)}
+              placeholder="เช่น หัวหน้างานสารสนเทศ" />
+          </div>
+
+          <div className="field">
+            <label>ประเภทผู้ใช้ <span className="req">*</span></label>
+            <select className="select" value={f.permission} disabled={isSelf}
+              onChange={e => set("permission", e.target.value)}>
+              {Object.entries(PERM_META).map(([k, v]) => (
+                <option key={k} value={k}>{v.label}</option>
+              ))}
+            </select>
+            {isSelf
+              ? <span className="hint">ไม่สามารถเปลี่ยนสิทธิ์ของตัวเองได้</span>
+              : <span className="hint">
+                  ผู้ดูแลระบบ: ทุกสิทธิ์ · ผู้กำหนดการประชุม: จัดการประชุม · บุคลากรทั่วไป: เข้าร่วมเท่านั้น
+                </span>
+            }
+          </div>
+
+          {err && (
+            <div className="chip" style={{ background:"var(--red-50)", color:"var(--red)", alignSelf:"flex-start" }}>
+              <IcoX size={14} /> {err}
+            </div>
+          )}
+        </div>
+
+        <div className="row" style={{ justifyContent:"flex-end", marginTop:22, gap:10 }}>
+          <button className="btn btn-soft" onClick={onClose}>ยกเลิก</button>
+          <button className="btn btn-primary" onClick={submit} disabled={busy}>
+            {busy ? "กำลังบันทึก…" : (isEdit ? "บันทึกการแก้ไข" : <><IcoPlus size={17} stroke="#fff" /> สร้างผู้ใช้</>)}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { Login, Dashboard, MeetingForm, Calendar, UserManagement, PERM_LABEL });

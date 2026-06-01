@@ -48,7 +48,7 @@ function handleGet(PDO $db): never
 
 function handlePost(PDO $db): never
 {
-    requireAuth();
+    requireRole(['admin', 'organizer']);
     $d = jsonBody();
 
     // Accept client-generated id (from uid() in JSX) or generate one
@@ -89,7 +89,7 @@ function handlePost(PDO $db): never
 
 function handlePut(PDO $db, string $id): never
 {
-    requireAuth();
+    requireRole(['admin', 'organizer']);
     if ($id === '') jsonError('Missing meeting id');
 
     $d = jsonBody();
@@ -127,7 +127,7 @@ function handlePut(PDO $db, string $id): never
 
 function handleDelete(PDO $db, string $id): never
 {
-    requireAuth();
+    requireRole(['admin', 'organizer']);
     if ($id === '') jsonError('Missing meeting id');
 
     $stmt = $db->prepare('DELETE FROM meetings WHERE id=?');

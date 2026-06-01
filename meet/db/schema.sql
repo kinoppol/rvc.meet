@@ -18,7 +18,9 @@ CREATE TABLE IF NOT EXISTS `users` (
     `username`      VARCHAR(100)  NOT NULL,
     `password_hash` VARCHAR(255)  NOT NULL,
     `name`          VARCHAR(200)  NOT NULL,
-    `role`          VARCHAR(100)  NOT NULL DEFAULT '',
+    `role`          VARCHAR(100)  NOT NULL DEFAULT '' COMMENT 'ตำแหน่ง/ฝ่ายงาน',
+    `permission`    VARCHAR(20)   NOT NULL DEFAULT 'staff'
+                                  COMMENT 'admin | organizer | staff',
     `created_at`    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     UNIQUE KEY `uq_username` (`username`)

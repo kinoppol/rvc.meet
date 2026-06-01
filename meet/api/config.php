@@ -1,17 +1,18 @@
 <?php
 declare(strict_types=1);
 
-/* ── Database defaults (overridden by db.config.php if present) ─── */
-define('DB_HOST',    'localhost');
-define('DB_PORT',    3306);
-define('DB_NAME',    'simplemeet');
-define('DB_USER',    'root');
-define('DB_PASS',    '');
-define('DB_CHARSET', 'utf8mb4');
-
+/* ── db.config.php (written by install.php) overrides defaults ──── */
 if (file_exists(__DIR__ . '/db.config.php')) {
     require_once __DIR__ . '/db.config.php';
 }
+
+/* ── Fallback defaults (used only when db.config.php is absent) ─── */
+defined('DB_HOST')    || define('DB_HOST',    'localhost');
+defined('DB_PORT')    || define('DB_PORT',    3306);
+defined('DB_NAME')    || define('DB_NAME',    'simplemeet');
+defined('DB_USER')    || define('DB_USER',    'root');
+defined('DB_PASS')    || define('DB_PASS',    '');
+defined('DB_CHARSET') || define('DB_CHARSET', 'utf8mb4');
 
 date_default_timezone_set('UTC');
 

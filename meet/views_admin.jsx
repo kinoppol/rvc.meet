@@ -1,0 +1,535 @@
+/* views_admin.jsx — login, dashboard (manage), form, calendar. Exports to window. */
+const { useState: useS, useMemo: useM, useEffect: useE } = React;
+
+/* ===================== LOGIN ===================== */
+function Login({ onLogin, onBack }) {
+  const [u,    setU]    = useS("");
+  const [p,    setP]    = useS("");
+  const [err,  setErr]  = useS("");
+  const [show, setShow] = useS(false);
+  const [busy, setBusy] = useS(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!u.trim() || !p) { setErr("กรุณากรอกชื่อผู้ใช้และรหัสผ่าน"); return; }
+    setBusy(true);
+    setErr("");
+    try {
+      const res  = await fetch("api/auth.php", {
+        method:      "POST",
+        headers:     { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body:        JSON.stringify({ username: u.trim(), password: p }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        onLogin(data.data.user);
+      } else {
+        setErr(data.error ?? "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
+      }
+    } catch {
+      setErr("ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="login-wrap">
+      <div className="login-art">
+        <div className="blob" style={{ width:300, height:300, background:"#fff", top:-60, right:-40 }}></div>
+        <div className="blob" style={{ width:220, height:220, background:"#ffd54f", bottom:40, left:-50 }}></div>
+        <div className="row" style={{ gap:12, position:"relative" }}>
+          <span style={{ width:44, height:44, borderRadius:13, background:"rgba(255,255,255,.18)",
+            display:"inline-flex", alignItems:"center", justifyContent:"center" }}>
+            <IcoVideo size={24} stroke="#fff" />
+          </span>
+          <div style={{ fontFamily:"var(--font-display)", fontWeight:700, fontSize:20 }}>SimpleMeet</div>
+        </div>
+        <div style={{ position:"relative" }}>
+          <h2>ระบบบริหารจัดการ<br/>การประชุมออนไลน์</h2>
+          <p style={{ marginTop:14 }}>สร้างและจัดการวาระการประชุมของสถานศึกษาได้ในที่เดียว เผยแพร่สู่หน้าสาธารณะโดยอัตโนมัติ</p>
+          <div className="feats">
+            {[
+              [IcoCalendar, "จัดวาระและกำหนดเวลาประชุมอย่างเป็นระบบ"],
+              [IcoLink,     "แนบลิงก์ Meet, Zoom, Webex, Teams"],
+              [IcoShield,   "ควบคุมการเปิด–ปิดลิงก์ตามเวลาจริง"],
+            ].map(([Ic, t], i) => (
+              <div className="feat" key={i}>
+                <span className="fi"><Ic size={18} stroke="#fff" /></span>{t}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{ fontSize:13, opacity:.8, position:"relative" }}>ระบบประชุมออนไลน์สำหรับสถานศึกษา</div>
+      </div>
+
+      <div className="login-form-side">
+        <div className="login-card">
+          <h2 style={{ fontFamily:"var(--font-display)", fontSize:26, fontWeight:700, margin:"0 0 6px" }}>เข้าสู่ระบบ</h2>
+          <p className="muted" style={{ margin:"0 0 24px", fontSize:14.5 }}>สำหรับเจ้าหน้าที่ผู้จัดการประชุมเท่านั้น</p>
+
+          <form onSubmit={submit} style={{ display:"flex", flexDirection:"column", gap:16 }}>
+            <div className="field">
+              <label>ชื่อผู้ใช้</label>
+              <input className="input" value={u}
+                onChange={e => { setU(e.target.value); setErr(""); }}
+                placeholder="กรอกชื่อผู้ใช้" autoFocus autoComplete="username" />
+            </div>
+            <div className="field">
+              <label>รหัสผ่าน</label>
+              <div style={{ position:"relative" }}>
+                <input className="input" type={show ? "text" : "password"} value={p}
+                  onChange={e => { setP(e.target.value); setErr(""); }}
+                  placeholder="กรอกรหัสผ่าน" style={{ paddingRight:44 }}
+                  autoComplete="current-password" />
+                <button type="button" className="icon-btn"
+                  style={{ position:"absolute", right:4, top:3, width:36, height:36 }}
+                  onClick={() => setShow(s => !s)}>
+                  <IcoEye size={18} />
+                </button>
+              </div>
+            </div>
+
+            {err && (
+              <div className="chip" style={{ background:"var(--red-50)", color:"var(--red)", alignSelf:"flex-start" }}>
+                <IcoX size={14} /> {err}
+              </div>
+            )}
+
+            <button className="btn btn-primary btn-lg btn-block" type="submit"
+              disabled={busy} style={{ marginTop:4 }}>
+              {busy
+                ? "กำลังตรวจสอบ…"
+                : <><span>เข้าสู่ระบบ</span> <IcoArrowR size={18} stroke="#fff" /></>}
+            </button>
+          </form>
+
+          <div className="card" style={{ marginTop:20, padding:"12px 16px", background:"var(--bg)", fontSize:13 }}>
+            <span className="muted">บัญชีทดลอง: </span><b>admin</b>{" "}
+            <span className="muted">/</span>{" "}<b>1234</b>
+            <span className="muted" style={{ display:"block", marginTop:4, fontSize:12 }}>
+              (ตั้งค่าผ่านหน้า install.php)
+            </span>
+          </div>
+
+          <button className="btn btn-soft btn-sm btn-block" style={{ marginTop:14 }} onClick={onBack}>
+            <IcoChevL size={16} /> กลับสู่หน้าวาระการประชุม
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ===================== DASHBOARD (manage) ===================== */
+function Dashboard({ meetings, auth, onOpen, onNew, onEdit, onDelete }) {
+  const now = useNow(1000);
+  const [q,      setQ]      = useS("");
+  const [filter, setFilter] = useS("all");
+
+  const filtered = useM(() => {
+    let list = [...meetings].sort((a, b) => new Date(a.start) - new Date(b.start));
+    if (q.trim()) {
+      const t = q.toLowerCase();
+      list = list.filter(m =>
+        (m.title + m.organizer + m.invitees + deptById(m.dept).name).toLowerCase().includes(t)
+      );
+    }
+    if      (filter === "today")    list = list.filter(m => isToday(new Date(m.start)));
+    else if (filter === "live")     list = list.filter(m => meetingStatus(m, now) === "live");
+    else if (filter === "upcoming") list = list.filter(m => meetingStatus(m, now) === "upcoming");
+    else if (filter === "past")     list = list.filter(m => ["ended","expired"].includes(meetingStatus(m, now)));
+    return list;
+  }, [meetings, q, filter, now]);
+
+  const counts = useM(() => ({
+    all:      meetings.length,
+    today:    meetings.filter(m => isToday(new Date(m.start))).length,
+    live:     meetings.filter(m => meetingStatus(m, now) === "live").length,
+    upcoming: meetings.filter(m => meetingStatus(m, now) === "upcoming").length,
+  }), [meetings, now]);
+
+  const tabs = [
+    ["all","ทั้งหมด"],["today","วันนี้"],["live","กำลังประชุม"],
+    ["upcoming","กำลังจะเริ่ม"],["past","ที่ผ่านมา"],
+  ];
+
+  return (
+    <div className="page page-wide">
+      <div className="page-head wrap" style={{ justifyContent:"space-between" }}>
+        <div>
+          <div className="h-title">จัดการการประชุม</div>
+          <div className="h-sub">
+            รายการประชุมทั้งหมด {counts.all} รายการ · กำลังประชุมอยู่ {counts.live} · กำลังจะเริ่ม {counts.upcoming}
+          </div>
+        </div>
+        <button className="btn btn-primary btn-lg" onClick={onNew}>
+          <IcoPlus size={19} stroke="#fff" /> สร้างการประชุม
+        </button>
+      </div>
+
+      <div className="row between wrap" style={{ marginBottom:18, gap:14 }}>
+        <div className="ftabs">
+          {tabs.map(([k, l]) => (
+            <button key={k} className={`ftab ${filter === k ? "on" : ""}`} onClick={() => setFilter(k)}>{l}</button>
+          ))}
+        </div>
+        <div className="search">
+          <IcoSearch />
+          <input value={q} onChange={e => setQ(e.target.value)}
+            placeholder="ค้นหาหัวข้อ ผู้จัด หรือฝ่ายงาน…" />
+          {q && (
+            <button className="icon-btn" style={{ width:28, height:28 }} onClick={() => setQ("")}>
+              <IcoX size={15} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {filtered.length === 0
+        ? <EmptyState icon={IcoSearch} title="ไม่พบการประชุม"
+            text="ลองปรับคำค้นหาหรือตัวกรอง หรือสร้างการประชุมใหม่"
+            action={<button className="btn btn-primary" onClick={onNew}><IcoPlus size={18} stroke="#fff" /> สร้างการประชุม</button>} />
+        : (
+          <div style={{ display:"flex", flexDirection:"column", gap:13 }}>
+            {filtered.map(m => (
+              <MeetingCard key={m.id} meeting={m} now={now} onOpen={onOpen}
+                showDate admin onEdit={onEdit} onDelete={onDelete} auth={auth} />
+            ))}
+          </div>
+        )}
+    </div>
+  );
+}
+
+/* ===================== FORM (create/edit) ===================== */
+function MeetingForm({ initial, onSave, onCancel }) {
+  const def = initial || {
+    title:"", description:"", organizer:"", dept:"exec", invitees:"",
+    start: toInputLocal(roundToNext()),
+    end:   toInputLocal(new Date(roundToNext().getTime() + 90 * 60000)),
+    platform:"meet", link:"", location:"", attachments:[],
+  };
+  const [f,    setF]    = useS({
+    ...def,
+    start: initial ? toInputLocal(new Date(initial.start)) : def.start,
+    end:   initial ? toInputLocal(new Date(initial.end))   : def.end,
+  });
+  const [errs, setErrs] = useS({});
+  const set = (k, v) => setF(prev => ({ ...prev, [k]: v }));
+
+  const validate = () => {
+    const e = {};
+    if (!f.title.trim())    e.title    = "กรุณาระบุหัวข้อการประชุม";
+    if (!f.organizer.trim()) e.organizer = "กรุณาระบุผู้จัด/ประธาน";
+    if (!f.link.trim())     e.link     = "กรุณาแนบลิงก์การประชุม";
+    if (!f.start)           e.start    = "ระบุเวลาเริ่ม";
+    if (!f.end)             e.end      = "ระบุเวลาสิ้นสุด";
+    if (f.start && f.end && new Date(f.end) <= new Date(f.start))
+      e.end = "เวลาสิ้นสุดต้องอยู่หลังเวลาเริ่ม";
+    setErrs(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const submit = () => {
+    if (!validate()) return;
+    onSave({
+      ...f,
+      title:     f.title.trim(),
+      organizer: f.organizer.trim(),
+      start:     new Date(f.start).toISOString(),
+      end:       new Date(f.end).toISOString(),
+      id:        initial ? initial.id : uid(),
+    });
+  };
+
+  const addFile = () => {
+    const name = prompt("ชื่อไฟล์วาระการประชุม (ตัวอย่าง):", "ระเบียบวาระการประชุม.pdf");
+    if (name) set("attachments", [...f.attachments, { name, size: (Math.floor(Math.random()*900)+100) + " KB" }]);
+  };
+  const rmFile = (i) => set("attachments", f.attachments.filter((_, idx) => idx !== i));
+
+  return (
+    <div className="page" style={{ maxWidth:860 }}>
+      <button className="btn btn-soft btn-sm" onClick={onCancel} style={{ marginBottom:18 }}>
+        <IcoChevL size={16} /> ยกเลิก
+      </button>
+      <div className="page-head">
+        <div>
+          <div className="h-title">{initial ? "แก้ไขการประชุม" : "สร้างการประชุมใหม่"}</div>
+          <div className="h-sub">กำหนดรายละเอียดวาระ เวลา และลิงก์เข้าร่วมการประชุม</div>
+        </div>
+      </div>
+
+      <div className="card" style={{ padding:28 }}>
+        <div className="form-grid">
+
+          <div className="field col-2">
+            <label>หัวข้อการประชุม <span className="req">*</span></label>
+            <input className="input" value={f.title}
+              onChange={e => set("title", e.target.value)}
+              placeholder="เช่น ประชุมคณะกรรมการบริหารสถานศึกษา ครั้งที่ .../..." />
+            {errs.title && <span className="hint" style={{ color:"var(--red)" }}>{errs.title}</span>}
+          </div>
+
+          <div className="field col-2">
+            <label>แพลตฟอร์มการประชุม <span className="req">*</span></label>
+            <div className="pf-picker">
+              {PLATFORMS_ORDER.map(k => {
+                const pf = PLATFORMS[k];
+                return (
+                  <button type="button" key={k}
+                    className={`pf-opt ${f.platform === k ? "sel" : ""}`}
+                    onClick={() => set("platform", k)}>
+                    <span className="pf-ic" style={{ background:pf.color }}>
+                      <pf.Icon stroke="#fff" />
+                    </span>
+                    {pf.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="field col-2">
+            <label>ลิงก์เข้าร่วมประชุม <span className="req">*</span></label>
+            <input className="input" value={f.link}
+              onChange={e => set("link", e.target.value)}
+              placeholder="https://meet.google.com/... หรือ https://zoom.us/j/..." />
+            {errs.link && <span className="hint" style={{ color:"var(--red)" }}>{errs.link}</span>}
+            <span className="hint">ลิงก์จะแสดงเป็นสีเทาจนกว่าจะถึงเวลาประชุม และถูกซ่อนภายใน 1 ชั่วโมงหลังการประชุมสิ้นสุด</span>
+          </div>
+
+          <div className="field">
+            <label>วันและเวลาเริ่ม <span className="req">*</span></label>
+            <input className="input" type="datetime-local" value={f.start}
+              onChange={e => set("start", e.target.value)} />
+            {errs.start && <span className="hint" style={{ color:"var(--red)" }}>{errs.start}</span>}
+          </div>
+          <div className="field">
+            <label>วันและเวลาสิ้นสุด <span className="req">*</span></label>
+            <input className="input" type="datetime-local" value={f.end}
+              onChange={e => set("end", e.target.value)} />
+            {errs.end && <span className="hint" style={{ color:"var(--red)" }}>{errs.end}</span>}
+          </div>
+
+          <div className="field">
+            <label>ฝ่ายงาน/หน่วยงานที่เกี่ยวข้อง</label>
+            <select className="select" value={f.dept} onChange={e => set("dept", e.target.value)}>
+              {DEPARTMENTS.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label>ผู้จัด/ประธาน <span className="req">*</span></label>
+            <input className="input" value={f.organizer}
+              onChange={e => set("organizer", e.target.value)}
+              placeholder="เช่น ผู้อำนวยการสถานศึกษา" />
+            {errs.organizer && <span className="hint" style={{ color:"var(--red)" }}>{errs.organizer}</span>}
+          </div>
+
+          <div className="field col-2">
+            <label>หน่วยงาน/บุคคลที่เชิญประชุม</label>
+            <input className="input" value={f.invitees}
+              onChange={e => set("invitees", e.target.value)}
+              placeholder="เช่น รองผู้อำนวยการทุกฝ่าย, หัวหน้าแผนกวิชา" />
+          </div>
+
+          <div className="field col-2">
+            <label>สถานที่/ห้องประชุม <span className="hint" style={{ fontWeight:400 }}>(กรณีประชุมแบบผสม)</span></label>
+            <input className="input" value={f.location}
+              onChange={e => set("location", e.target.value)}
+              placeholder="เช่น ห้องประชุมเกียรติยศ อาคารอำนวยการ" />
+          </div>
+
+          <div className="field col-2">
+            <label>รายละเอียด/วาระโดยสังเขป</label>
+            <textarea className="textarea" value={f.description}
+              onChange={e => set("description", e.target.value)}
+              placeholder="ระบุวัตถุประสงค์หรือวาระสำคัญของการประชุม" />
+          </div>
+
+          <div className="field col-2">
+            <label>ไฟล์วาระการประชุม <span className="hint" style={{ fontWeight:400 }}>(ไม่บังคับ)</span></label>
+            {f.attachments.length > 0 && (
+              <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:10 }}>
+                {f.attachments.map((file, i) => (
+                  <div className="file-row" key={i}>
+                    <span className="f-ic"><IcoFile size={18} /></span>
+                    <div className="grow">
+                      <div className="f-name">{file.name}</div>
+                      <div className="f-size">{file.size}</div>
+                    </div>
+                    <button className="icon-btn" onClick={() => rmFile(i)}><IcoTrash size={18} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button type="button" className="filedrop" onClick={addFile} style={{ cursor:"pointer", width:"100%" }}>
+              <IcoFile size={22} /> <span style={{ marginLeft:8 }}>คลิกเพื่อแนบไฟล์วาระการประชุม (PDF, DOCX)</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="row" style={{ justifyContent:"flex-end", marginTop:26, gap:10 }}>
+          <button className="btn btn-soft" onClick={onCancel}>ยกเลิก</button>
+          <button className="btn btn-primary btn-lg" onClick={submit}>
+            <IcoCheck size={18} stroke="#fff" /> {initial ? "บันทึกการแก้ไข" : "บันทึกการประชุม"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+function roundToNext() { const d = new Date(); d.setMinutes(d.getMinutes() < 30 ? 30 : 60, 0, 0); return d; }
+
+/* ===================== CALENDAR ===================== */
+function Calendar({ meetings, onOpen }) {
+  const now       = useNow(30000);
+  const [view,      setView]      = useS("month");
+  const [cursor,    setCursor]    = useS(() => { const d = new Date(); d.setDate(1); d.setHours(0,0,0,0); return d; });
+  const [weekStart, setWeekStart] = useS(() => startOfWeek(new Date()));
+
+  const byDay = useM(() => {
+    const map = {};
+    meetings.forEach(m => { const k = dayKey(new Date(m.start)); (map[k] = map[k] || []).push(m); });
+    Object.values(map).forEach(arr => arr.sort((a, b) => new Date(a.start) - new Date(b.start)));
+    return map;
+  }, [meetings]);
+
+  if (view === "week") return <WeekView {...{ weekStart, setWeekStart, byDay, now, onOpen, view, setView }} />;
+
+  const gridStart = startOfWeek(new Date(cursor));
+  const cells = Array.from({ length: 42 }, (_, i) => { const d = new Date(gridStart); d.setDate(d.getDate() + i); return d; });
+
+  return (
+    <div className="page page-wide">
+      <div className="page-head wrap" style={{ justifyContent:"space-between" }}>
+        <div>
+          <div className="h-title">ปฏิทินการประชุม</div>
+          <div className="h-sub">{TH_MON_FULL[cursor.getMonth()]} {cursor.getFullYear()+543}</div>
+        </div>
+        <div className="row" style={{ gap:12 }}>
+          <div className="seg">
+            <button className={view==="month"?"on":""} onClick={() => setView("month")}>เดือน</button>
+            <button className={view==="week" ?"on":""} onClick={() => setView("week")}>สัปดาห์</button>
+          </div>
+          <div className="row" style={{ gap:4 }}>
+            <button className="icon-btn" onClick={() => setCursor(c => addMonths(c, -1))}><IcoChevL size={20} /></button>
+            <button className="btn btn-soft btn-sm"
+              onClick={() => { const d = new Date(); d.setDate(1); d.setHours(0,0,0,0); setCursor(d); }}>วันนี้</button>
+            <button className="icon-btn" onClick={() => setCursor(c => addMonths(c,  1))}><IcoChevR size={20} /></button>
+          </div>
+        </div>
+      </div>
+
+      <div className="cal-grid">
+        {["อา","จ","อ","พ","พฤ","ศ","ส"].map(d => <div className="cal-dow" key={d}>{d}</div>)}
+        {cells.map((d, i) => {
+          const out = d.getMonth() !== cursor.getMonth();
+          const evs = byDay[dayKey(d)] || [];
+          return (
+            <div className={`cal-cell ${out?"out":""} ${isToday(d)?"today":""}`} key={i}>
+              <span className="cdate">{d.getDate()}</span>
+              {evs.slice(0, 3).map(m => {
+                const st   = meetingStatus(m, now);
+                const dept = deptById(m.dept);
+                return (
+                  <div key={m.id} className="cal-ev" onClick={() => onOpen(m)}
+                    style={{ background: st==="live" ? "var(--green)" : (st==="upcoming" ? dept.color : "var(--faint)"), opacity: out ? .55 : 1 }}
+                    title={m.title}>{fmtTime(new Date(m.start))} {m.title}</div>
+                );
+              })}
+              {evs.length > 3 && <span className="cal-more">+{evs.length-3} รายการ</span>}
+            </div>
+          );
+        })}
+      </div>
+      <CalLegend />
+    </div>
+  );
+}
+
+function WeekView({ weekStart, setWeekStart, byDay, now, onOpen, view, setView }) {
+  const days = Array.from({ length:7 }, (_, i) => { const d = new Date(weekStart); d.setDate(d.getDate()+i); return d; });
+  const end  = days[6];
+  return (
+    <div className="page page-wide">
+      <div className="page-head wrap" style={{ justifyContent:"space-between" }}>
+        <div>
+          <div className="h-title">ปฏิทินการประชุม</div>
+          <div className="h-sub">{fmtDateNum(weekStart)} – {fmtDateNum(end)}</div>
+        </div>
+        <div className="row" style={{ gap:12 }}>
+          <div className="seg">
+            <button className={view==="month"?"on":""} onClick={() => setView("month")}>เดือน</button>
+            <button className={view==="week" ?"on":""} onClick={() => setView("week")}>สัปดาห์</button>
+          </div>
+          <div className="row" style={{ gap:4 }}>
+            <button className="icon-btn" onClick={() => setWeekStart(w => addDays(w, -7))}><IcoChevL size={20} /></button>
+            <button className="btn btn-soft btn-sm" onClick={() => setWeekStart(startOfWeek(new Date()))}>สัปดาห์นี้</button>
+            <button className="icon-btn" onClick={() => setWeekStart(w => addDays(w,  7))}><IcoChevR size={20} /></button>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:12 }}>
+        {days.map((d, i) => {
+          const evs = byDay[dayKey(d)] || [];
+          return (
+            <div key={i} className="card" style={{ padding:0, minHeight:220, display:"flex",
+              flexDirection:"column", borderColor: isToday(d) ? "var(--blue)" : "var(--line)" }}>
+              <div style={{ padding:"10px 12px", borderBottom:"1px solid var(--line)", textAlign:"center",
+                background: isToday(d) ? "var(--blue-50)" : "transparent", borderRadius:"16px 16px 0 0" }}>
+                <div style={{ fontSize:12, color:"var(--muted)", fontWeight:600 }}>{TH_DOW_S[d.getDay()]}</div>
+                <div style={{ fontFamily:"var(--font-display)", fontWeight:700, fontSize:18,
+                  color: isToday(d) ? "var(--blue)" : "var(--ink)" }}>{d.getDate()}</div>
+              </div>
+              <div style={{ padding:8, display:"flex", flexDirection:"column", gap:6, flex:1 }}>
+                {evs.length === 0 && (
+                  <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center",
+                    color:"var(--faint)", fontSize:12 }}>—</div>
+                )}
+                {evs.map(m => {
+                  const st = meetingStatus(m, now); const dept = deptById(m.dept);
+                  return (
+                    <button key={m.id} onClick={() => onOpen(m)}
+                      style={{ textAlign:"left", border:"none", background:"var(--bg)",
+                        borderLeft:`3px solid ${st==="live"?"var(--green)":dept.color}`,
+                        borderRadius:8, padding:"7px 9px", cursor:"pointer" }}>
+                      <div style={{ fontSize:11.5, color:"var(--muted)", fontWeight:600 }}>{fmtTime(new Date(m.start))} น.</div>
+                      <div style={{ fontSize:12.5, fontWeight:600, lineHeight:1.3, marginTop:2,
+                        display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical", overflow:"hidden" }}>
+                        {m.title}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <CalLegend />
+    </div>
+  );
+}
+
+function CalLegend() {
+  return (
+    <div className="row wrap" style={{ gap:18, marginTop:18, fontSize:13 }}>
+      <span className="row" style={{ gap:7 }}><span className="dot dot-live"></span> กำลังประชุม</span>
+      {DEPARTMENTS.map(d => (
+        <span className="row" key={d.id} style={{ gap:7 }}>
+          <span className="dot" style={{ background:d.color }}></span>{d.name}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function startOfWeek(d)  { const x = new Date(d); x.setDate(x.getDate()-x.getDay()); x.setHours(0,0,0,0); return x; }
+function addDays(d, n)   { const x = new Date(d); x.setDate(x.getDate()+n); return x; }
+function addMonths(d, n) { const x = new Date(d); x.setMonth(x.getMonth()+n); return x; }
+
+Object.assign(window, { Login, Dashboard, MeetingForm, Calendar });

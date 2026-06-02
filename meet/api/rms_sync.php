@@ -125,16 +125,14 @@ function fetchUrl(string $url): array
         $lastErr = $err ?: "cURL HTTP $code";
     }
 
-    /* 2. file_get_contents (ถ้า allow_url_fopen เปิด) */
-    if (ini_get('allow_url_fopen')) {
-        $ctx  = stream_context_create([
-            'http' => ['timeout' => 15, 'ignore_errors' => true, 'user_agent' => 'RVCMeet/1.0'],
-            'ssl'  => ['verify_peer' => false, 'verify_peer_name' => false],
-        ]);
-        $body = @file_get_contents($url, false, $ctx);
-        if ($body !== false) return [$body, ''];
-        $lastErr = 'file_get_contents ล้มเหลว';
-    }
+    /* 2. file_get_contents + stream_context (ssl verify_peer=false, ไม่ตรวจ allow_url_fopen) */
+    $ctx  = stream_context_create([
+        'ssl'  => ['verify_peer' => false, 'verify_peer_name' => false],
+        'http' => ['timeout' => 15, 'ignore_errors' => true, 'user_agent' => 'RVCMeet/1.0'],
+    ]);
+    $body = @file_get_contents($url, false, $ctx);
+    if ($body !== false && $body !== '') return [$body, ''];
+    $lastErr = 'file_get_contents ล้มเหลว';
 
     /* 3. stream_socket_client — ไม่ต้องใช้ cURL หรือ allow_url_fopen */
     [$socketBody, $socketErr] = fetchViaSocket($url);

@@ -92,42 +92,122 @@ jsonError('Method not allowed', 405);
 /* ═══════════════════════════════════════════════════════════ */
 
 /**
- * ดึง URL โดยลอง cURL ก่อน แล้ว fallback ไป file_get_contents
+ * ดึง URL ด้วย 3 วิธีตามลำดับ: cURL → file_get_contents → stream_socket_client
  * @return array{0: string|null, 1: string}  [body|null, errorMsg]
  */
 function fetchUrl(string $url): array
 {
-    /* ลอง cURL ก่อน */
+    $lastErr = 'ไม่มีวิธีเชื่อมต่อที่ใช้งานได้';
+
+    /* 1. cURL */
     if (function_exists('curl_init')) {
         $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 15,
             CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_SSL_VERIFYPEER => false,   // ผ่อนปรนสำหรับ self-signed cert
+            CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_USERAGENT      => 'RVCMeet/1.0',
         ]);
         $body = curl_exec($ch);
         $err  = curl_error($ch);
         $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
-
-        if ($body !== false && $code >= 200 && $code < 300) {
-            return [$body, ''];
-        }
-        $curlErr = $err ?: "HTTP $code";
-    } else {
-        $curlErr = 'curl ไม่พร้อมใช้งาน';
+        if ($body !== false && $code >= 200 && $code < 300) return [$body, ''];
+        $lastErr = $err ?: "cURL HTTP $code";
     }
 
-    /* fallback: file_get_contents */
+    /* 2. file_get_contents (ถ้า allow_url_fopen เปิด) */
     if (ini_get('allow_url_fopen')) {
-        $ctx  = stream_context_create(['http' => ['timeout' => 15, 'ignore_errors' => true]]);
+        $ctx  = stream_context_create([
+            'http' => ['timeout' => 15, 'ignore_errors' => true, 'user_agent' => 'RVCMeet/1.0'],
+            'ssl'  => ['verify_peer' => false, 'verify_peer_name' => false],
+        ]);
         $body = @file_get_contents($url, false, $ctx);
         if ($body !== false) return [$body, ''];
+        $lastErr = 'file_get_contents ล้มเหลว';
     }
 
-    return [null, $curlErr];
+    /* 3. stream_socket_client — ไม่ต้องใช้ cURL หรือ allow_url_fopen */
+    [$socketBody, $socketErr] = fetchViaSocket($url);
+    if ($socketBody !== null) return [$socketBody, ''];
+    $lastErr = $socketErr;
+
+    return [null, $lastErr];
+}
+
+/**
+ * HTTP GET ผ่าน stream_socket_client (รองรับ HTTPS, ไม่ต้องการ cURL)
+ */
+function fetchViaSocket(string $url): array
+{
+    $parts  = parse_url($url);
+    $scheme = $parts['scheme'] ?? 'http';
+    $host   = $parts['host']   ?? '';
+    $path   = ($parts['path']  ?? '/');
+    $query  = isset($parts['query']) ? '?' . $parts['query'] : '';
+    $port   = $parts['port']   ?? ($scheme === 'https' ? 443 : 80);
+    $target = $scheme === 'https' ? "ssl://$host:$port" : "tcp://$host:$port";
+
+    $ctx  = stream_context_create([
+        'ssl' => ['verify_peer' => false, 'verify_peer_name' => false, 'allow_self_signed' => true],
+    ]);
+    $sock = @stream_socket_client($target, $errno, $errstr, 15, STREAM_CLIENT_CONNECT, $ctx);
+    if (!$sock) return [null, "socket [$errno] $errstr"];
+
+    stream_set_timeout($sock, 15);
+
+    $req = implode("\r\n", [
+        "GET {$path}{$query} HTTP/1.1",
+        "Host: $host",
+        "User-Agent: RVCMeet/1.0",
+        "Accept: application/json",
+        "Connection: close",
+        "", "",
+    ]);
+    fwrite($sock, $req);
+
+    $raw = '';
+    while (!feof($sock)) $raw .= fread($sock, 8192);
+    fclose($sock);
+
+    /* แยก header กับ body */
+    $sep = strpos($raw, "\r\n\r\n");
+    if ($sep === false) return [null, 'socket: response ไม่สมบูรณ์'];
+
+    $headers   = substr($raw, 0, $sep);
+    $body      = substr($raw, $sep + 4);
+    $firstLine = strtok($headers, "\r\n");
+
+    /* ตรวจ HTTP status */
+    if (!preg_match('#HTTP/\d+\.\d+\s+(\d+)#', $firstLine, $m)) {
+        return [null, 'socket: response ไม่ถูกต้อง'];
+    }
+    $status = (int)$m[1];
+    if ($status < 200 || $status >= 300) {
+        return [null, "socket HTTP $status"];
+    }
+
+    /* chunked transfer encoding */
+    if (stripos($headers, 'Transfer-Encoding: chunked') !== false) {
+        $body = httpDechunk($body);
+    }
+
+    return [$body ?: null, $body ? '' : 'socket: body ว่าง'];
+}
+
+function httpDechunk(string $body): string
+{
+    $out = '';
+    while ($body !== '') {
+        $pos  = strpos($body, "\r\n");
+        if ($pos === false) break;
+        $size = hexdec(trim(substr($body, 0, $pos)));
+        if ($size === 0) break;
+        $out  .= substr($body, $pos + 2, $size);
+        $body  = substr($body, $pos + 2 + $size + 2);
+    }
+    return $out;
 }
 
 function doSync(PDO $db, array $people): array

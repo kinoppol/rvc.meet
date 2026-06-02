@@ -113,13 +113,6 @@ function Login({ onLogin, onBack }) {
             </button>
           </form>
 
-          <div className="card" style={{ marginTop:20, padding:"12px 16px", background:"var(--bg)", fontSize:13 }}>
-            <span className="muted">บัญชีทดลอง: </span><b>admin</b>{" "}
-            <span className="muted">/</span>{" "}<b>1234</b>
-            <span className="muted" style={{ display:"block", marginTop:4, fontSize:12 }}>
-              (ตั้งค่าผ่านหน้า install.php)
-            </span>
-          </div>
 
           <button className="btn btn-soft btn-sm btn-block" style={{ marginTop:14 }} onClick={onBack}>
             <IcoChevL size={16} /> กลับสู่หน้าวาระการประชุม

@@ -456,6 +456,7 @@ input, select, textarea { font-family: inherit; }
 /* toast */
 .toast { position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 13px 22px; border-radius: var(--radius-pill); font-size: 14px; font-weight: 500; box-shadow: var(--shadow-lg); z-index: 200; display: flex; align-items: center; gap: 10px; animation: toastin .25s ease; }
 @keyframes toastin { from { opacity: 0; transform: translate(-50%, 12px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* modal */
 .modal-bg { position: fixed; inset: 0; background: rgba(32,33,36,.5); backdrop-filter: blur(2px); z-index: 150; display: flex; align-items: center; justify-content: center; padding: 24px; animation: fade .2s; }

@@ -744,20 +744,35 @@ function UserManagement({ currentUser }) {
         </div>
       </div>
 
-      {/* RMS sync status */}
-      {(rmsStatus?.last_synced_at || rmsError) && (
-        <div className="card" style={{ padding:"10px 16px", marginBottom:16, fontSize:13, display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
-          {rmsError
-            ? <><IcoX size={14} stroke="var(--red)" /><span style={{ color:"var(--red)" }}>{rmsError}</span></>
-            : <>
-                <IcoCheckCircle size={14} stroke="var(--green)" />
-                <span className="muted">อัพเดตล่าสุด:</span>
-                <span>{rmsStatus.last_synced_at ? fmtDateTime(rmsStatus.last_synced_at) : "—"}</span>
-                <span className="muted" style={{ marginLeft:8 }}>
-                  เพิ่ม {rmsStatus.added ?? 0} · อัพเดต {rmsStatus.updated ?? 0} · ลบ {rmsStatus.deleted ?? 0}
-                </span>
-              </>
-          }
+      {/* RMS sync status / loading */}
+      {(rmsSyncing || rmsStatus?.last_synced_at || rmsError) && (
+        <div className="card" style={{
+          padding:"10px 16px", marginBottom:16, fontSize:13,
+          display:"flex", alignItems:"center", gap:10, flexWrap:"wrap",
+          borderColor: rmsSyncing ? "var(--blue)" : rmsError ? "var(--red)" : undefined,
+        }}>
+          {rmsSyncing ? (
+            <>
+              <span style={{
+                width:16, height:16, borderRadius:"50%", flexShrink:0,
+                border:"2.5px solid var(--blue)", borderTopColor:"transparent",
+                display:"inline-block", animation:"spin 0.8s linear infinite",
+              }} />
+              <span style={{ color:"var(--blue)", fontWeight:600 }}>กำลังโอนข้อมูลจากระบบ RMS…</span>
+              <span className="muted">กรุณารอสักครู่</span>
+            </>
+          ) : rmsError ? (
+            <><IcoX size={14} stroke="var(--red)" /><span style={{ color:"var(--red)" }}>{rmsError}</span></>
+          ) : (
+            <>
+              <IcoCheckCircle size={14} stroke="var(--green)" />
+              <span className="muted">อัพเดตล่าสุด:</span>
+              <span>{rmsStatus.last_synced_at ? fmtDateTime(rmsStatus.last_synced_at) : "—"}</span>
+              <span className="muted" style={{ marginLeft:8 }}>
+                เพิ่ม {rmsStatus.added ?? 0} · อัพเดต {rmsStatus.updated ?? 0} · ลบ {rmsStatus.deleted ?? 0}
+              </span>
+            </>
+          )}
         </div>
       )}
 

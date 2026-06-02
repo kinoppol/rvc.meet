@@ -207,7 +207,7 @@ function Dashboard({ meetings, auth, onOpen, onNew, onEdit, onDelete }) {
 /* ===================== FORM (create/edit) ===================== */
 function MeetingForm({ initial, onSave, onCancel }) {
   const def = initial || {
-    title:"", description:"", organizer:"", dept:"exec", invitees:"",
+    title:"", description:"", organizer:"", dept:"director", invitees:"",
     start: toInputLocal(roundToNext()),
     end:   toInputLocal(new Date(roundToNext().getTime() + 90 * 60000)),
     platform:"meet", link:"", location:"", attachments:[],
@@ -346,7 +346,19 @@ function MeetingForm({ initial, onSave, onCancel }) {
           <div className="field">
             <label>ฝ่ายงาน/หน่วยงานที่เกี่ยวข้อง</label>
             <select className="select" value={f.dept} onChange={e => set("dept", e.target.value)}>
-              {DEPARTMENTS.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+              {(() => {
+                const groups = [];
+                const seen = {};
+                DEPARTMENTS.forEach(d => {
+                  if (!seen[d.group]) { seen[d.group] = []; groups.push(d.group); }
+                  seen[d.group].push(d);
+                });
+                return groups.map(g => (
+                  <optgroup key={g} label={g}>
+                    {seen[g].map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </optgroup>
+                ));
+              })()}
             </select>
           </div>
           <div className="field">

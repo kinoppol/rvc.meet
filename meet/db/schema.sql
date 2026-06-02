@@ -59,3 +59,24 @@ CREATE TABLE IF NOT EXISTS `attachments` (
         FOREIGN KEY (`meeting_id`) REFERENCES `meetings` (`id`)
         ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ── Attendance ────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS `attendance` (
+    `id`         INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+    `meeting_id` VARCHAR(20)   NOT NULL,
+    `user_id`    INT UNSIGNED  NULL     COMMENT 'null = manual entry by admin/organizer',
+    `name`       VARCHAR(200)  NOT NULL,
+    `location`   VARCHAR(500)  NOT NULL DEFAULT '' COMMENT 'สถานที่เข้าประชุม หรือสาเหตุที่ขาดประชุม',
+    `is_absent`  TINYINT(1)    NOT NULL DEFAULT 0,
+    `notes`      TEXT,
+    `lat`        DECIMAL(9,6)  NULL     COMMENT 'GPS latitude ของผู้ลงชื่อ',
+    `lng`        DECIMAL(10,6) NULL     COMMENT 'GPS longitude ของผู้ลงชื่อ',
+    `signed_at`  DATETIME      NOT NULL,
+    `last_seen_at` DATETIME    NULL     COMMENT 'heartbeat timestamp จาก frontend',
+    `added_by`   INT UNSIGNED  NULL     COMMENT 'user_id ของผู้เพิ่มรายการ (manual entries)',
+    PRIMARY KEY (`id`),
+    KEY `idx_att_meet` (`meeting_id`),
+    CONSTRAINT `fk_attendance_meeting`
+        FOREIGN KEY (`meeting_id`) REFERENCES `meetings` (`id`)
+        ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

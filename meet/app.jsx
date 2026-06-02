@@ -1,14 +1,32 @@
 /* app.jsx — shell, routing, topbar. PHP API-backed version. */
 const { useState: useSt, useEffect: useEf } = React;
 
+/* ── Theme management ─────────────────────────────── */
+const THEME_CYCLE  = ['system', 'light', 'dark'];
+const THEME_LABELS = { system: 'อัตโนมัติ (ระบบ)', light: 'โหมดสว่าง', dark: 'โหมดมืด' };
+const THEME_ICONS  = { system: IcoMonitor, light: IcoSun, dark: IcoMoon };
+
+function resolveTheme(mode) {
+  if (mode === 'system') {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  return mode;
+}
+function applyTheme(mode) {
+  document.documentElement.setAttribute('data-theme', resolveTheme(mode));
+}
+/* Apply saved theme immediately (before React mounts) */
+applyTheme(localStorage.getItem('theme') || 'system');
+
 /* ── Permission helpers ──────────────────────────────────── */
 const isAdmin     = (auth) => auth?.permission === 'admin';
 const canManage   = (auth) => auth?.permission === 'admin' || auth?.permission === 'organizer';
 
 /* ── Topbar ──────────────────────────────────────────────── */
-function Topbar({ auth, view, go, onLogout }) {
-  const now = useNow(1000);
-  const p   = auth?.permission;
+function Topbar({ auth, view, go, onLogout, theme, onCycleTheme }) {
+  const now   = useNow(1000);
+  const p     = auth?.permission;
+  const ThIco = THEME_ICONS[theme] || IcoMonitor;
 
   const navItems = [
     ["agenda",    "วาระวันนี้",    IcoCalendar],
@@ -20,10 +38,7 @@ function Topbar({ auth, view, go, onLogout }) {
   return (
     <div className="topbar">
       <div className="brand" onClick={() => go(canManage(auth) ? "dashboard" : "agenda")}>
-        <span style={{ width:38, height:38, borderRadius:11, background:"var(--blue)",
-          display:"inline-flex", alignItems:"center", justifyContent:"center" }}>
-          <IcoVideo size={21} stroke="#fff" />
-        </span>
+        <img src="logo.png" alt="logo" style={{ width:42, height:42, objectFit:"contain", flexShrink:0 }} />
         <div>
           <div className="brand-name">SimpleMeet</div>
           <div className="brand-sub">ระบบประชุมออนไลน์สถานศึกษา</div>
@@ -46,6 +61,10 @@ function Topbar({ auth, view, go, onLogout }) {
         <span className="t">{fmtTime(now)} น.</span>
         <span className="d">{fmtDateShort(now)} {now.getFullYear() + 543}</span>
       </div>
+
+      <button className="icon-btn theme-btn" onClick={onCycleTheme} title={THEME_LABELS[theme]}>
+        <ThIco size={19} />
+      </button>
 
       {auth ? (
         <div className="row" style={{ gap:10, marginLeft:8 }}>
@@ -120,6 +139,23 @@ function App() {
   const [confirm,  setConfirm]  = useSt(null);
   const [loading,  setLoading]  = useSt(true);
   const [apiError, setApiError] = useSt(null);
+  const [theme,    setTheme]    = useSt(localStorage.getItem('theme') || 'system');
+
+  /* Apply theme + listen for system preference changes */
+  useEf(() => {
+    applyTheme(theme);
+    localStorage.setItem('theme', theme);
+    if (theme !== 'system') return;
+    const mq  = window.matchMedia('(prefers-color-scheme: dark)');
+    const fn  = () => applyTheme('system');
+    mq.addEventListener('change', fn);
+    return () => mq.removeEventListener('change', fn);
+  }, [theme]);
+
+  const cycleTheme = () => {
+    const next = THEME_CYCLE[(THEME_CYCLE.indexOf(theme) + 1) % THEME_CYCLE.length];
+    setTheme(next);
+  };
 
   /* Load auth + meetings on mount */
   useEf(() => {
@@ -239,7 +275,8 @@ function App() {
   return (
     <div className="app">
       {view !== "login" && (
-        <Topbar auth={auth} view={view} go={go} onLogout={doLogout} />
+        <Topbar auth={auth} view={view} go={go} onLogout={doLogout}
+          theme={theme} onCycleTheme={cycleTheme} />
       )}
 
       {view === "agenda"    && <PublicAgenda meetings={meetings} auth={auth} onOpen={openDetail} onGoLogin={() => go("login")} />}

@@ -37,6 +37,14 @@ const IcoSparkle = (p) => <Ico {...p}><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 1
 const IcoShield = (p) => <Ico {...p}><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></Ico>;
 const IcoCopy = (p) => <Ico {...p}><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></Ico>;
 const IcoEye = (p) => <Ico {...p}><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/></Ico>;
+const IcoClipboard = (p) => <Ico {...p}><rect x="8" y="3" width="8" height="4" rx="1.5"/><rect x="4" y="5" width="16" height="16" rx="2.5"/><path d="M8 11h8M8 15h5"/></Ico>;
+const IcoUserCheck = (p) => <Ico {...p}><circle cx="9" cy="8" r="3.6"/><path d="M3 20c0-3.4 2.7-6 6-6s6 2.6 6 6"/><path d="M17 11l2 2 4-4"/></Ico>;
+const IcoWalk     = (p) => <Ico {...p}><circle cx="13" cy="3.5" r="1.7"/><path d="M10 7.5l3 2 3-1.5"/><path d="M13 9.5l-2.5 5.5 3 .5"/><path d="M10.5 15l-2 5.5"/><path d="M13.5 15.5l2 5"/><path d="M10 9.5l-2 3"/></Ico>;
+const IcoMaximize = (p) => <Ico {...p}><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></Ico>;
+const IcoMinimize = (p) => <Ico {...p}><path d="M8 3v5H3M21 8h-5V3M3 16h5v5M16 21v-5h5"/></Ico>;
+const IcoSun      = (p) => <Ico {...p}><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></Ico>;
+const IcoMoon     = (p) => <Ico {...p}><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></Ico>;
+const IcoMonitor  = (p) => <Ico {...p}><rect x="2" y="3" width="20" height="14" rx="2.5"/><path d="M8 21h8M12 17v4"/></Ico>;
 
 /* ---- Platform brand glyphs ---- */
 const PfMeet = (p) => <Ico {...p}><rect x="2.5" y="7" width="12" height="10" rx="2.5"/><path d="M14.5 10.5l5-3v9l-5-3"/></Ico>;
@@ -58,6 +66,7 @@ Object.assign(window, {
   IcoCalendar, IcoClock, IcoVideo, IcoUsers, IcoUser, IcoPin, IcoLink, IcoFile,
   IcoDownload, IcoPlus, IcoSearch, IcoEdit, IcoTrash, IcoChevL, IcoChevR, IcoChevDown,
   IcoArrowR, IcoCheck, IcoCheckCircle, IcoX, IcoLock, IcoLogout, IcoBuilding, IcoList,
-  IcoGrid, IcoBell, IcoSparkle, IcoShield, IcoCopy, IcoEye,
+  IcoGrid, IcoBell, IcoSparkle, IcoShield, IcoCopy, IcoEye, IcoClipboard, IcoUserCheck, IcoWalk,
+  IcoMaximize, IcoMinimize, IcoSun, IcoMoon, IcoMonitor,
   PfMeet, PfZoom, PfWebex, PfTeams, PfOther,
 });

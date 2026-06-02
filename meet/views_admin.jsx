@@ -1,5 +1,5 @@
 /* views_admin.jsx — login, dashboard (manage), form, calendar, user management. Exports to window. */
-const { useState: useS, useMemo: useM, useEffect: useE } = React;
+const { useState: useS, useMemo: useM, useEffect: useE, useRef: useR } = React;
 
 /* ── Permission meta ─────────────────────────────────────── */
 const PERM_META = {
@@ -134,7 +134,7 @@ function Login({ onLogin, onBack }) {
 function Dashboard({ meetings, auth, onOpen, onNew, onEdit, onDelete }) {
   const now = useNow(1000);
   const [q,      setQ]      = useS("");
-  const [filter, setFilter] = useS("all");
+  const [filter, setFilter] = useS("today");
 
   const filtered = useM(() => {
     let list = [...meetings].sort((a, b) => new Date(a.start) - new Date(b.start));
@@ -252,10 +252,38 @@ function MeetingForm({ initial, onSave, onCancel }) {
     });
   };
 
-  const addFile = () => {
-    const name = prompt("ชื่อไฟล์วาระการประชุม (ตัวอย่าง):", "ระเบียบวาระการประชุม.pdf");
-    if (name) set("attachments", [...f.attachments, { name, size: (Math.floor(Math.random()*900)+100) + " KB" }]);
+  const [uploading, setUploading] = useS(false);
+  const [uploadErr, setUploadErr] = useS("");
+  const fileInputRef = useR(null);
+
+  const pickFile = () => { setUploadErr(""); fileInputRef.current?.click(); };
+
+  const onFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > 1 * 1024 * 1024) { setUploadErr("ขนาดไฟล์เกิน 1 MB"); return; }
+    const ext = file.name.split(".").pop().toLowerCase();
+    if (!["pdf","docx"].includes(ext)) { setUploadErr("อนุญาตเฉพาะ PDF และ DOCX"); return; }
+
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res  = await fetch("api/upload.php", { method:"POST", credentials:"same-origin", body: fd });
+      const data = await res.json();
+      if (data.success) {
+        set("attachments", [...f.attachments, {
+          name: data.data.filename, size: data.data.filesize,
+          stored_name: data.data.stored_name, url: data.data.url,
+        }]);
+      } else {
+        setUploadErr(data.error || "อัพโหลดไม่สำเร็จ");
+      }
+    } catch { setUploadErr("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"); }
+    finally { setUploading(false); }
   };
+
   const rmFile = (i) => set("attachments", f.attachments.filter((_, idx) => idx !== i));
 
   return (
@@ -368,14 +396,20 @@ function MeetingForm({ initial, onSave, onCancel }) {
                       <div className="f-name">{file.name}</div>
                       <div className="f-size">{file.size}</div>
                     </div>
-                    <button className="icon-btn" onClick={() => rmFile(i)}><IcoTrash size={18} /></button>
+                    <button className="icon-btn" title="ลบ" onClick={() => rmFile(i)}><IcoTrash size={18} /></button>
                   </div>
                 ))}
               </div>
             )}
-            <button type="button" className="filedrop" onClick={addFile} style={{ cursor:"pointer", width:"100%" }}>
-              <IcoFile size={22} /> <span style={{ marginLeft:8 }}>คลิกเพื่อแนบไฟล์วาระการประชุม (PDF, DOCX)</span>
+            <input ref={fileInputRef} type="file" accept=".pdf,.docx" style={{ display:"none" }} onChange={onFileChange} />
+            <button type="button" className="filedrop" onClick={pickFile} disabled={uploading} style={{ cursor:"pointer", width:"100%" }}>
+              <IcoFile size={22} />
+              <span style={{ marginLeft:8 }}>
+                {uploading ? "กำลังอัพโหลด…" : "คลิกเพื่อแนบไฟล์วาระการประชุม (PDF, DOCX)"}
+              </span>
             </button>
+            {uploadErr && <span className="hint" style={{ color:"var(--red)", marginTop:6 }}>{uploadErr}</span>}
+            <span className="hint" style={{ marginTop:4 }}>ขนาดไฟล์สูงสุด 1 MB ต่อไฟล์</span>
           </div>
         </div>
 

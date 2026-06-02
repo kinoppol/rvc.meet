@@ -171,6 +171,151 @@ function MeetingCard({ meeting, now, onOpen, showDate = false, admin = false, on
   );
 }
 
+/* modal: self sign-in for a live meeting */
+function CheckInModal({ meeting, auth, onDone, onCancel }) {
+  const [mode, setMode]         = useState("attend"); // "attend" | "absent"
+  const [location, setLocation] = useState("");
+  const [notes, setNotes]       = useState("");
+  const [saving, setSaving]     = useState(false);
+  const [error, setError]       = useState("");
+  const [geoState, setGeoState] = useState("idle"); // "idle"|"loading"|"ok"|"denied"
+  const coordsRef               = useRef(null); // { lat, lng }
+
+  /* Start requesting GPS as soon as modal opens */
+  useEffect(() => {
+    if (!navigator.geolocation) { setGeoState("denied"); return; }
+    setGeoState("loading");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        coordsRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setGeoState("ok");
+      },
+      () => setGeoState("denied"),
+      { timeout: 10000, maximumAge: 60000 }
+    );
+  }, []);
+
+  const submit = async () => {
+    if (!location.trim()) {
+      setError(mode === "attend" ? "กรุณาระบุสถานที่เข้าประชุม" : "กรุณาระบุสาเหตุที่ไม่สามารถเข้าร่วม");
+      return;
+    }
+    setSaving(true);
+    try {
+      const body = {
+        meeting_id: meeting.id,
+        location:   location.trim(),
+        is_absent:  mode === "absent",
+        notes:      notes.trim(),
+      };
+      if (coordsRef.current) {
+        body.lat = coordsRef.current.lat;
+        body.lng = coordsRef.current.lng;
+      }
+      const res  = await fetch("api/attendance.php", {
+        method:      "POST",
+        headers:     { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body:        JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (data.success) { onDone(data.data); }
+      else              { setError(data.error || "เกิดข้อผิดพลาด"); }
+    } catch {
+      setError("ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="modal-bg" onClick={onCancel}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440 }}>
+        <h3 style={{ margin: "0 0 4px", fontSize: 20 }}>ลงชื่อเข้าประชุม</h3>
+        <div className="muted" style={{ fontSize: 13.5, marginBottom: 20 }}>{meeting.title}</div>
+
+        <div className="field">
+          <label>ชื่อ-สกุล</label>
+          <input className="input" value={auth.name} disabled />
+        </div>
+
+        <div className="field" style={{ marginTop: 16 }}>
+          <label>สถานะการเข้าร่วม</label>
+          <div className="row" style={{ gap: 10, marginTop: 8 }}>
+            <button
+              type="button"
+              className={`btn ${mode === "attend" ? "btn-primary" : "btn-soft"}`}
+              style={{ flex: 1 }}
+              onClick={() => { setMode("attend"); setLocation(""); setError(""); }}
+            >
+              <IcoUserCheck size={16} stroke={mode === "attend" ? "#fff" : undefined} />
+              เข้าประชุม
+            </button>
+            <button
+              type="button"
+              className={`btn ${mode === "absent" ? "btn-danger" : "btn-soft"}`}
+              style={{ flex: 1 }}
+              onClick={() => { setMode("absent"); setLocation(""); setError(""); }}
+            >
+              <IcoX size={16} stroke="currentColor" />
+              ไม่สามารถเข้าร่วมได้
+            </button>
+          </div>
+        </div>
+
+        {/* GPS status indicator */}
+        <div style={{ fontSize: 12.5, marginTop: 10, display: "flex", alignItems: "center", gap: 6,
+          color: geoState === "ok" ? "var(--green)" : geoState === "denied" ? "var(--muted)" : "var(--amber)" }}>
+          {geoState === "loading" && <><IcoClock size={13} /> กำลังขอตำแหน่ง GPS…</>}
+          {geoState === "ok"      && <><IcoCheckCircle size={13} stroke="var(--green)" /> บันทึกพิกัดแล้ว</>}
+          {geoState === "denied"  && <><IcoPin size={13} /> ไม่สามารถขอตำแหน่งได้ — จะบันทึกโดยไม่มีพิกัด</>}
+        </div>
+
+        <div className="field" style={{ marginTop: 16 }}>
+          <label>
+            {mode === "attend" ? "สถานที่เข้าประชุม" : "สาเหตุที่ไม่สามารถเข้าร่วม"}
+            <span className="req"> *</span>
+          </label>
+          <input
+            className="input"
+            placeholder={
+              mode === "attend"
+                ? "เช่น บ้าน, สำนักงาน, ห้องประชุมอาคาร A"
+                : "เช่น ติดภารกิจราชการ, ป่วย, ติดการสอน"
+            }
+            value={location}
+            autoFocus
+            onChange={(e) => { setLocation(e.target.value); setError(""); }}
+          />
+        </div>
+
+        <div className="field" style={{ marginTop: 14 }}>
+          <label>หมายเหตุ <span className="muted" style={{ fontWeight: 400 }}>(ถ้ามี)</span></label>
+          <input
+            className="input"
+            placeholder="รายละเอียดเพิ่มเติม..."
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+          />
+        </div>
+
+        {error && (
+          <div style={{ color: "var(--red)", fontSize: 13.5, marginTop: 10 }}>
+            <IcoX size={14} stroke="var(--red)" /> {error}
+          </div>
+        )}
+
+        <div className="row" style={{ justifyContent: "flex-end", marginTop: 22, gap: 10 }}>
+          <button className="btn btn-soft" onClick={onCancel}>ยกเลิก</button>
+          <button className="btn btn-primary" onClick={submit} disabled={saving}>
+            {saving ? "กำลังบันทึก…" : <><IcoCheck size={16} stroke="#fff" /> ยืนยันการลงชื่อ</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* toast */
 function Toast({ msg, onDone }) {
   useEffect(() => { const t = setTimeout(onDone, 2600); return () => clearTimeout(t); }, [msg]);
@@ -208,5 +353,6 @@ function EmptyState({ icon, title, text, action }) {
 }
 
 Object.assign(window, {
-  useNow, Avatar, PlatformBadge, StatusPill, JoinLink, MeetingCard, Toast, ConfirmModal, EmptyState,
+  useNow, Avatar, PlatformBadge, StatusPill, JoinLink, MeetingCard,
+  CheckInModal, Toast, ConfirmModal, EmptyState,
 });

@@ -22,6 +22,7 @@ const TH_MON_FULL = ["มกราคม","กุมภาพันธ์","ม�
                      "กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
 
 const fmtTime      = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const fmtDateTime  = (isoStr) => { const d = new Date(isoStr.replace(' ', 'T') + (isoStr.includes('Z') ? '' : 'Z')); return `${fmtDateShort(d)} ${fmtTime(d)} น.`; };
 const fmtDateShort = (d) => `${TH_DOW_S[d.getDay()]} ${d.getDate()} ${TH_MON[d.getMonth()]}`;
 const fmtDateLong  = (d) => `วัน${TH_DOW[d.getDay()]}ที่ ${d.getDate()} ${TH_MON_FULL[d.getMonth()]} ${d.getFullYear() + 543}`;
 const fmtDateNum   = (d) => `${d.getDate()} ${TH_MON[d.getMonth()]} ${(d.getFullYear()+543)%100}`;
@@ -61,7 +62,7 @@ const uid = () => "m" + Math.random().toString(36).slice(2, 9);
 Object.assign(window, {
   DEPARTMENTS, deptById,
   PLATFORMS_ORDER: ["meet","zoom","webex","teams","other"],
-  fmtTime, fmtDateShort, fmtDateLong, fmtDateNum,
+  fmtTime, fmtDateTime, fmtDateShort, fmtDateLong, fmtDateNum,
   sameDay, isToday, dayKey, toInputLocal, durationMin, fmtDuration,
   TH_DOW_S, TH_MON, TH_MON_FULL, TH_DOW,
   meetingStatus, countdownTo, uid,

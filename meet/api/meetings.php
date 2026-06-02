@@ -9,6 +9,7 @@ $id     = trim($_GET['id'] ?? '');
 
 try {
     $db = getDB();
+    ensureAttachmentStoredName($db);
     match ($method) {
         'GET'    => handleGet($db),
         'POST'   => handlePost($db),
@@ -29,13 +30,12 @@ function handleGet(PDO $db): never
     )->fetchAll();
 
     $atts = $db->query(
-        'SELECT meeting_id, filename, filesize FROM attachments ORDER BY id ASC'
+        'SELECT meeting_id, filename, filesize, stored_name FROM attachments ORDER BY id ASC'
     )->fetchAll();
 
-    // Group attachments by meeting_id
     $attMap = [];
     foreach ($atts as $a) {
-        $attMap[$a['meeting_id']][] = ['name' => $a['filename'], 'size' => $a['filesize']];
+        $attMap[$a['meeting_id']][] = attRow($a);
     }
 
     $result = array_map(
@@ -51,18 +51,12 @@ function handlePost(PDO $db): never
     requireRole(['admin', 'organizer']);
     $d = jsonBody();
 
-    // Accept client-generated id (from uid() in JSX) or generate one
     $id = preg_replace('/[^a-z0-9_-]/i', '', $d['id'] ?? '');
-    if ($id === '') {
-        $id = 'm' . bin2hex(random_bytes(4));
-    }
+    if ($id === '') $id = 'm' . bin2hex(random_bytes(4));
 
-    // Prevent duplicate id
     $chk = $db->prepare('SELECT id FROM meetings WHERE id = ?');
     $chk->execute([$id]);
-    if ($chk->fetch()) {
-        $id = 'm' . bin2hex(random_bytes(4));
-    }
+    if ($chk->fetch()) $id = 'm' . bin2hex(random_bytes(4));
 
     $db->prepare(
         'INSERT INTO meetings
@@ -120,6 +114,17 @@ function handlePut(PDO $db, string $id): never
         if (!$chk->fetch()) jsonError('Meeting not found', 404);
     }
 
+    /* Delete old attachments that are no longer in the list, keeping files on disk if re-referenced */
+    $keepNames = array_filter(array_map(fn($a) => trim($a['stored_name'] ?? ''), $d['attachments'] ?? []));
+    $oldStmt   = $db->prepare('SELECT stored_name FROM attachments WHERE meeting_id=?');
+    $oldStmt->execute([$id]);
+    foreach ($oldStmt->fetchAll(PDO::FETCH_COLUMN) as $sn) {
+        if ($sn && !in_array($sn, $keepNames, true)) {
+            $path = __DIR__ . '/../uploads/' . basename($sn);
+            if (file_exists($path)) @unlink($path);
+        }
+    }
+
     $db->prepare('DELETE FROM attachments WHERE meeting_id=?')->execute([$id]);
     insertAttachments($db, $id, $d['attachments'] ?? []);
     jsonOk(fetchMeeting($db, $id));
@@ -130,26 +135,55 @@ function handleDelete(PDO $db, string $id): never
     requireRole(['admin', 'organizer']);
     if ($id === '') jsonError('Missing meeting id');
 
+    /* Remove uploaded files before deleting the meeting */
+    $aStmt = $db->prepare('SELECT stored_name FROM attachments WHERE meeting_id=?');
+    $aStmt->execute([$id]);
+    foreach ($aStmt->fetchAll(PDO::FETCH_COLUMN) as $sn) {
+        if ($sn) {
+            $path = __DIR__ . '/../uploads/' . basename($sn);
+            if (file_exists($path)) @unlink($path);
+        }
+    }
+
     $stmt = $db->prepare('DELETE FROM meetings WHERE id=?');
     $stmt->execute([$id]);
-
-    if ($stmt->rowCount() === 0) {
-        jsonError('Meeting not found', 404);
-    }
+    if ($stmt->rowCount() === 0) jsonError('Meeting not found', 404);
 
     jsonOk(['deleted' => $id]);
 }
 
 /* ───────────────────── Helpers ───────────────────── */
 
+function ensureAttachmentStoredName(PDO $db): void
+{
+    try {
+        $db->exec("ALTER TABLE attachments ADD COLUMN IF NOT EXISTS stored_name VARCHAR(80) DEFAULT NULL");
+    } catch (\Throwable) {}
+}
+
+function attRow(array $a): array
+{
+    return [
+        'name'        => $a['filename'],
+        'size'        => $a['filesize'],
+        'stored_name' => $a['stored_name'] ?? null,
+        'url'         => $a['stored_name'] ? 'uploads/' . $a['stored_name'] : null,
+    ];
+}
+
 function insertAttachments(PDO $db, string $meetingId, array $atts): void
 {
     if (empty($atts)) return;
     $stmt = $db->prepare(
-        'INSERT INTO attachments (meeting_id, filename, filesize) VALUES (?,?,?)'
+        'INSERT INTO attachments (meeting_id, filename, filesize, stored_name) VALUES (?,?,?,?)'
     );
     foreach ($atts as $a) {
-        $stmt->execute([$meetingId, trim($a['name'] ?? ''), trim($a['size'] ?? '')]);
+        $stmt->execute([
+            $meetingId,
+            trim($a['name']         ?? ''),
+            trim($a['size']         ?? ''),
+            trim($a['stored_name']  ?? '') ?: null,
+        ]);
     }
 }
 
@@ -161,13 +195,10 @@ function fetchMeeting(PDO $db, string $id): array
     if (!$m) jsonError('Meeting not found', 404);
 
     $aStmt = $db->prepare(
-        'SELECT filename, filesize FROM attachments WHERE meeting_id=? ORDER BY id ASC'
+        'SELECT filename, filesize, stored_name FROM attachments WHERE meeting_id=? ORDER BY id ASC'
     );
     $aStmt->execute([$id]);
-    $atts = array_map(
-        static fn($r) => ['name' => $r['filename'], 'size' => $r['filesize']],
-        $aStmt->fetchAll()
-    );
+    $atts = array_map('attRow', $aStmt->fetchAll());
 
     return formatMeeting($m, $atts);
 }

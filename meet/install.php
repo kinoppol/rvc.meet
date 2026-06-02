@@ -102,6 +102,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $canInstall) {
                 ON DELETE CASCADE ON UPDATE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `attendance` (
+            `id`         INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+            `meeting_id` VARCHAR(20)   NOT NULL,
+            `user_id`    INT UNSIGNED  NULL,
+            `name`       VARCHAR(200)  NOT NULL,
+            `location`   VARCHAR(500)  NOT NULL DEFAULT '',
+            `is_absent`  TINYINT(1)    NOT NULL DEFAULT 0,
+            `notes`      TEXT,
+            `signed_at`  DATETIME      NOT NULL,
+            `added_by`   INT UNSIGNED  NULL,
+            PRIMARY KEY (`id`),
+            KEY `idx_att_meet` (`meeting_id`),
+            CONSTRAINT `fk_attendance_meeting`
+                FOREIGN KEY (`meeting_id`) REFERENCES `meetings`(`id`)
+                ON DELETE CASCADE ON UPDATE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
         /* 4. Admin user */
         $hash = password_hash($adm['password'], PASSWORD_BCRYPT, ['cost' => 12]);
         $pdo->prepare(

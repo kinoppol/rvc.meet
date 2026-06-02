@@ -7,5 +7,9 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Uploaded files (user-generated content)
+meet/uploads/*
+!meet/uploads/.htaccess
+
 # XAMPP logs / temp
 *.log

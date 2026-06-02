@@ -40,7 +40,7 @@ function Topbar({ auth, view, go, onLogout, theme, onCycleTheme }) {
       <div className="brand" onClick={() => go(canManage(auth) ? "dashboard" : "agenda")}>
         <img src="logo.png" alt="logo" style={{ width:42, height:42, objectFit:"contain", flexShrink:0 }} />
         <div>
-          <div className="brand-name">SimpleMeet</div>
+          <div className="brand-name">RVCMeet</div>
           <div className="brand-sub">ระบบประชุมออนไลน์สถานศึกษา</div>
         </div>
       </div>
@@ -98,7 +98,7 @@ function LoadingScreen() {
         <IcoVideo size={26} stroke="#fff" />
       </span>
       <div style={{ fontFamily:"var(--font-display)", fontWeight:600, fontSize:19,
-        color:"var(--ink-2)" }}>กำลังโหลด SimpleMeet…</div>
+        color:"var(--ink-2)" }}>กำลังโหลด RVCMeet…</div>
       <div className="muted" style={{ fontSize:14 }}>กำลังเชื่อมต่อฐานข้อมูล</div>
     </div>
   );

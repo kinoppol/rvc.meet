@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 /* ─────────────────────────────────────────────────────────────
-   SimpleMeet — Web Installer
+   RVCMeet — Web Installer
    สร้างฐานข้อมูล, ตาราง, ผู้ดูแลระบบ และข้อมูลตัวอย่าง
 ───────────────────────────────────────────────────────────── */
 
@@ -310,7 +310,7 @@ function installSeed(PDO $pdo): void
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>ติดตั้ง SimpleMeet</title>
+<title>ติดตั้ง RVCMeet</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -340,7 +340,7 @@ function installSeed(PDO $pdo): void
       </svg>
     </span>
     <div>
-      <div style="font-family:var(--font-display);font-size:22px;font-weight:700;letter-spacing:-.3px;">SimpleMeet</div>
+      <div style="font-family:var(--font-display);font-size:22px;font-weight:700;letter-spacing:-.3px;">RVCMeet</div>
       <div style="font-size:13px;color:var(--muted);">ระบบประชุมออนไลน์สถานศึกษา — ตัวติดตั้ง</div>
     </div>
   </div>
@@ -466,7 +466,7 @@ function installSeed(PDO $pdo): void
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;">
         <path d="M12 5v14M5 12h14"/>
       </svg>
-      ติดตั้ง SimpleMeet
+      ติดตั้ง RVCMeet
     </button>
   </form>
 

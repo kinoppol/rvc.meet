@@ -52,7 +52,7 @@ function Login({ onLogin, onBack }) {
             display:"inline-flex", alignItems:"center", justifyContent:"center" }}>
             <IcoVideo size={24} stroke="#fff" />
           </span>
-          <div style={{ fontFamily:"var(--font-display)", fontWeight:700, fontSize:20 }}>SimpleMeet</div>
+          <div style={{ fontFamily:"var(--font-display)", fontWeight:700, fontSize:20 }}>RVCMeet</div>
         </div>
         <div style={{ position:"relative" }}>
           <h2>ระบบบริหารจัดการ<br/>การประชุมออนไลน์</h2>

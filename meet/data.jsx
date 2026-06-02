@@ -15,6 +15,7 @@ const DEPARTMENTS = [
   { id: "dual",       name: "งานอาชีวศึกษาระบบทวิภาคี",                 color: "#2da050", group: "ฝ่ายวิชาการ" },
   { id: "media",      name: "งานสื่อการเรียนการสอน",                     color: "#2da050", group: "ฝ่ายวิชาการ" },
   { id: "registry",   name: "งานทะเบียน",                               color: "#2da050", group: "ฝ่ายวิชาการ" },
+  { id: "section",    name: "แผนกวิชา",                                 color: "#2da050", group: "ฝ่ายวิชาการ" },
 
   /* ── ฝ่ายแผนงานและความร่วมมือ ── */
   { id: "planning",   name: "ฝ่ายแผนงานและความร่วมมือ",                 color: "#6c5ce7", group: "ฝ่ายแผนงานและความร่วมมือ" },
@@ -45,7 +46,13 @@ const DEPARTMENTS = [
   { id: "welfare",    name: "งานสวัสดิการนักเรียน นักศึกษา",            color: "#c4177a", group: "ฝ่ายพัฒนากิจการนักเรียน นักศึกษา" },
   { id: "community",  name: "งานโครงการพิเศษและบริการชุมชน",            color: "#c4177a", group: "ฝ่ายพัฒนากิจการนักเรียน นักศึกษา" },
 ];
-const deptById = (id) => DEPARTMENTS.find(d => d.id === id) || DEPARTMENTS[0];
+const deptById = (id) => {
+  if (id && id.startsWith("section:")) {
+    const sname = id.slice(8).trim();
+    return { id, name: sname ? `แผนกวิชา${sname}` : "แผนกวิชา", color: "#2da050", group: "ฝ่ายวิชาการ" };
+  }
+  return DEPARTMENTS.find(d => d.id === id) || DEPARTMENTS[0];
+};
 
 /* ── Time helpers ────────────────────────────────────────── */
 const pad = (n) => String(n).padStart(2, "0");

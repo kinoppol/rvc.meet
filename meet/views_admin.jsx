@@ -212,11 +212,17 @@ function MeetingForm({ initial, onSave, onCancel }) {
     end:   toInputLocal(new Date(roundToNext().getTime() + 90 * 60000)),
     platform:"meet", link:"", location:"", attachments:[],
   };
+  /* แยก dept กับ ชื่อแผนก ออกจากกัน เมื่อโหลดจาก initial */
+  const initDept = initial?.dept?.startsWith("section:") ? "section" : (initial?.dept ?? "director");
+  const initSect = initial?.dept?.startsWith("section:") ? initial.dept.slice(8) : "";
+
   const [f,    setF]    = useS({
     ...def,
+    dept:  initDept,
     start: initial ? toInputLocal(new Date(initial.start)) : def.start,
     end:   initial ? toInputLocal(new Date(initial.end))   : def.end,
   });
+  const [sectName, setSectName] = useS(initSect);
   const [errs, setErrs] = useS({});
   const set = (k, v) => setF(prev => ({ ...prev, [k]: v }));
 
@@ -235,8 +241,12 @@ function MeetingForm({ initial, onSave, onCancel }) {
 
   const submit = () => {
     if (!validate()) return;
+    const finalDept = f.dept === "section"
+      ? "section:" + sectName.trim()
+      : f.dept;
     onSave({
       ...f,
+      dept:      finalDept,
       title:     f.title.trim(),
       organizer: f.organizer.trim(),
       start:     new Date(f.start).toISOString(),
@@ -345,7 +355,7 @@ function MeetingForm({ initial, onSave, onCancel }) {
 
           <div className="field">
             <label>ฝ่ายงาน/หน่วยงานที่เกี่ยวข้อง</label>
-            <select className="select" value={f.dept} onChange={e => set("dept", e.target.value)}>
+            <select className="select" value={f.dept} onChange={e => { set("dept", e.target.value); if (e.target.value !== "section") setSectName(""); }}>
               {(() => {
                 const groups = [];
                 const seen = {};
@@ -360,6 +370,16 @@ function MeetingForm({ initial, onSave, onCancel }) {
                 ));
               })()}
             </select>
+            {f.dept === "section" && (
+              <input
+                className="input"
+                style={{ marginTop: 8 }}
+                placeholder="ระบุชื่อแผนกวิชา เช่น ช่างยนต์, การบัญชี, คอมพิวเตอร์ธุรกิจ"
+                value={sectName}
+                autoFocus
+                onChange={e => setSectName(e.target.value)}
+              />
+            )}
           </div>
           <div className="field">
             <label>ผู้จัด/ประธาน <span className="req">*</span></label>

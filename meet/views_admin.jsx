@@ -653,7 +653,11 @@ function UserManagement({ currentUser }) {
         credentials: "same-origin",
         body: JSON.stringify({ force }),
       });
-      const data = await res.json();
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); }
+      catch { setRmsError(`Server ตอบกลับไม่ใช่ JSON (HTTP ${res.status}): ${text.slice(0, 200)}`); return; }
+
       if (data.success) {
         setRmsStatus(prev => ({ ...prev, ...data.data, last_synced_at: data.data.synced_at ?? prev?.last_synced_at }));
         if (data.data.synced) {
@@ -667,7 +671,7 @@ function UserManagement({ currentUser }) {
         setRmsError(data.error ?? "เกิดข้อผิดพลาด");
       }
     } catch (e) {
-      setRmsError("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้");
+      setRmsError("fetch ล้มเหลว: " + e.message);
     } finally {
       setRmsSyncing(false);
     }

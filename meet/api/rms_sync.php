@@ -7,7 +7,7 @@ header('Content-Type: application/json; charset=utf-8');
 
 /* ── Global exception safety ── */
 set_exception_handler(function (\Throwable $e) {
-    http_response_code(500);
+    http_response_code(400);
     echo json_encode(['success' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
     exit;
 });
@@ -20,7 +20,7 @@ try {
     $db = getDB();
     ensureRmsSyncTable($db);
 } catch (\Throwable $e) {
-    jsonError('ไม่สามารถเชื่อมต่อฐานข้อมูล: ' . $e->getMessage(), 500);
+    jsonError('ไม่สามารถเชื่อมต่อฐานข้อมูล: ' . $e->getMessage());
 }
 
 /* ── GET: คืนสถานะ sync ล่าสุด ── */
@@ -47,12 +47,12 @@ if ($method === 'POST') {
     [$raw, $fetchErr] = fetchUrl($url);
 
     if ($raw === null) {
-        jsonError('ไม่สามารถเชื่อมต่อ RMS: ' . $fetchErr, 502);
+        jsonError('ไม่สามารถเชื่อมต่อ RMS: ' . $fetchErr);   // 400 — ไม่ใช้ 5xx เพื่อหลีกเลี่ยง proxy แทนที่ response
     }
 
     $people = json_decode($raw, true);
     if (!is_array($people)) {
-        jsonError('RMS ส่งข้อมูลไม่ถูกต้อง (ไม่ใช่ JSON array) — ได้รับ: ' . mb_substr($raw, 0, 120), 502);
+        jsonError('RMS ส่งข้อมูลไม่ถูกต้อง (ไม่ใช่ JSON array) — ได้รับ: ' . mb_substr($raw, 0, 120));
     }
 
     /* ── ตรวจสอบ hash ── */
@@ -71,7 +71,7 @@ if ($method === 'POST') {
     try {
         $result = doSync($db, $people);
     } catch (\Throwable $e) {
-        jsonError('เกิดข้อผิดพลาดระหว่าง sync: ' . $e->getMessage(), 500);
+        jsonError('เกิดข้อผิดพลาดระหว่าง sync: ' . $e->getMessage());
     }
 
     saveLog($db, $newHash, $result);

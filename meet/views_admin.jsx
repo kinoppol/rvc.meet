@@ -610,6 +610,7 @@ function UserManagement({ currentUser }) {
   const [rmsStatus,  setRmsStatus]  = useS(null);
   const [rmsSyncing, setRmsSyncing] = useS(false);
   const [rmsError,   setRmsError]   = useS("");
+  const [rmsModal,   setRmsModal]   = useS(false);  // modal วาง JSON
 
   const reloadUsers = () =>
     fetch("api/users.php", { credentials:"same-origin" })
@@ -636,34 +637,18 @@ function UserManagement({ currentUser }) {
       const lastMs  = rmsStatus.last_synced_at ? new Date(rmsStatus.last_synced_at + 'Z').getTime() : 0;
       const interval = (rmsStatus.interval_sec ?? 3600) * 1000;
       if (Date.now() - lastMs >= interval) {
-        doRmsSync(false);
+        setRmsModal(true); // เปิด modal ให้ผู้ใช้วาง JSON เมื่อถึงเวลา
       }
     };
     const t = setInterval(check, 60 * 1000); // ตรวจทุกนาที
     return () => clearInterval(t);
   }, [rmsStatus]);
 
-  const doRmsSync = async (force = true) => {
+  /* ส่ง people array (ที่ได้จาก RMS) ให้ PHP ประมวลผล */
+  const doRmsSync = async (people, force = true) => {
     setRmsSyncing(true);
     setRmsError("");
     try {
-      /* ── Step 1: browser ดึงข้อมูลจาก RMS โดยตรง ── */
-      const rmsUrl = rmsStatus?.rms_url;
-      if (!rmsUrl) { setRmsError("ไม่ทราบ URL ของ RMS กรุณา reload หน้า"); return; }
-
-      let people;
-      try {
-        const rmsRes = await fetch(rmsUrl, { mode: "cors" });
-        if (!rmsRes.ok) throw new Error(`HTTP ${rmsRes.status}`);
-        const rmsText = await rmsRes.text();
-        people = JSON.parse(rmsText);
-        if (!Array.isArray(people)) throw new Error("ข้อมูล RMS ไม่ใช่ array");
-      } catch (e) {
-        setRmsError("ดึงข้อมูลจาก RMS ไม่ได้: " + e.message);
-        return;
-      }
-
-      /* ── Step 2: ส่ง people array ให้ PHP ประมวลผล ── */
       const res  = await fetch("api/rms_sync.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -741,9 +726,9 @@ function UserManagement({ currentUser }) {
           <div className="h-sub">บัญชีผู้ใช้ทั้งหมด {users.length} บัญชี</div>
         </div>
         <div className="row" style={{ gap:10, flexWrap:"wrap" }}>
-          <button className="btn btn-soft" onClick={() => doRmsSync(true)} disabled={rmsSyncing}
-            title="ดึงข้อมูลบุคลากรจากระบบ RMS และโอนเข้าระบบ">
-            <IcoUsers size={17} stroke={rmsSyncing ? "var(--muted)" : undefined} />
+          <button className="btn btn-soft" onClick={() => { setRmsError(""); setRmsModal(true); }} disabled={rmsSyncing}
+            title="โอนข้อมูลบุคลากรจากระบบ RMS">
+            <IcoUsers size={17} />
             {rmsSyncing ? "กำลังโอนข้อมูล…" : "โอนข้อมูลผู้ใช้จากระบบ RMS"}
           </button>
           <button className="btn btn-primary btn-lg"
@@ -856,6 +841,71 @@ function UserManagement({ currentUser }) {
       )}
 
       <Toast msg={toast} onDone={() => setToast("")} />
+
+      {rmsModal && (
+        <RmsSyncModal
+          rmsUrl={rmsStatus?.rms_url}
+          syncing={rmsSyncing}
+          onSync={(people) => { setRmsModal(false); doRmsSync(people, true); }}
+          onCancel={() => setRmsModal(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ── RMS Sync Modal ── */
+function RmsSyncModal({ rmsUrl, syncing, onSync, onCancel }) {
+  const [jsonText, setJsonText] = useS("");
+  const [err,      setErr]      = useS("");
+
+  const handleSync = () => {
+    setErr("");
+    let parsed;
+    try { parsed = JSON.parse(jsonText.trim()); } catch { setErr("JSON ไม่ถูกต้อง กรุณาตรวจสอบข้อมูลที่วาง"); return; }
+    if (!Array.isArray(parsed)) { setErr("ข้อมูลต้องเป็น array [ ... ]"); return; }
+    onSync(parsed);
+  };
+
+  return (
+    <div className="modal-bg" onClick={onCancel}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:560 }}>
+        <h3 style={{ margin:"0 0 6px", fontSize:20 }}>โอนข้อมูลผู้ใช้จากระบบ RMS</h3>
+        <p className="muted" style={{ margin:"0 0 18px", fontSize:13.5, lineHeight:1.6 }}>
+          เนื่องจากข้อจำกัดด้าน CORS ให้ดำเนินการดังนี้:
+        </p>
+
+        <ol style={{ margin:"0 0 18px", paddingLeft:20, fontSize:13.5, lineHeight:2, color:"var(--ink-2)" }}>
+          <li>คลิกปุ่ม <b>เปิดข้อมูล RMS</b> ด้านล่าง (จะเปิด tab ใหม่)</li>
+          <li>กด <b>Ctrl+A</b> เพื่อเลือกข้อมูลทั้งหมด แล้วกด <b>Ctrl+C</b> เพื่อคัดลอก</li>
+          <li>กลับมาที่หน้านี้แล้ววางข้อมูลในช่องด้านล่าง</li>
+          <li>กดปุ่ม <b>โอนข้อมูล</b></li>
+        </ol>
+
+        {rmsUrl && (
+          <a href={rmsUrl} target="_blank" rel="noreferrer"
+            className="btn btn-soft btn-sm" style={{ marginBottom:14, display:"inline-flex" }}>
+            <IcoLink size={15} /> เปิดข้อมูล RMS (tab ใหม่)
+          </a>
+        )}
+
+        <div className="field">
+          <label>วาง JSON ที่ได้จาก RMS <span className="req">*</span></label>
+          <textarea className="textarea" rows={6}
+            placeholder='[{"people_id":"...","people_name":"...","ath_pass":"...",...}]'
+            value={jsonText} onChange={e => { setJsonText(e.target.value); setErr(""); }}
+            style={{ fontFamily:"monospace", fontSize:12.5 }}
+          />
+          {err && <span className="hint" style={{ color:"var(--red)", marginTop:4 }}>{err}</span>}
+        </div>
+
+        <div className="row" style={{ justifyContent:"flex-end", marginTop:20, gap:10 }}>
+          <button className="btn btn-soft" onClick={onCancel}>ยกเลิก</button>
+          <button className="btn btn-primary" onClick={handleSync} disabled={syncing || !jsonText.trim()}>
+            {syncing ? "กำลังโอน…" : <><IcoCheck size={16} stroke="#fff" /> โอนข้อมูล</>}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

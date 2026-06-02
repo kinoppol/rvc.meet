@@ -5,14 +5,26 @@ require_once __DIR__ . '/rms_config.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
+/* ── Global exception safety ── */
+set_exception_handler(function (\Throwable $e) {
+    http_response_code(500);
+    echo json_encode(['success' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    exit;
+});
+
 requireRole(['admin']);
 
 $method = $_SERVER['REQUEST_METHOD'];
-$db     = getDB();
-ensureRmsSyncTable($db);
 
+try {
+    $db = getDB();
+    ensureRmsSyncTable($db);
+} catch (\Throwable $e) {
+    jsonError('ไม่สามารถเชื่อมต่อฐานข้อมูล: ' . $e->getMessage(), 500);
+}
+
+/* ── GET: คืนสถานะ sync ล่าสุด ── */
 if ($method === 'GET') {
-    /* ── ตรวจสอบ auto-sync: คืนสถานะและ sync ถ้าเกิน interval ── */
     $log = getLastLog($db);
     jsonOk([
         'last_synced_at' => $log['synced_at']   ?? null,
@@ -25,49 +37,53 @@ if ($method === 'GET') {
     ]);
 }
 
+/* ── POST: sync ── */
 if ($method === 'POST') {
     $body  = json_decode((string)file_get_contents('php://input'), true) ?? [];
     $force = (bool)($body['force'] ?? false);
 
     /* ── ดึงข้อมูลจาก RMS ── */
-    $url      = rtrim(RMS_BASE_URL, '/') . '/' . ltrim(RMS_PEOPLE_PATH, '/');
-    $ctx      = stream_context_create(['http' => ['timeout' => 15, 'ignore_errors' => true]]);
-    $raw      = @file_get_contents($url, false, $ctx);
+    $url = rtrim(RMS_BASE_URL, '/') . '/' . ltrim(RMS_PEOPLE_PATH, '/');
+    [$raw, $fetchErr] = fetchUrl($url);
 
-    if ($raw === false) {
-        jsonError('ไม่สามารถเชื่อมต่อ RMS ได้: ' . $url, 502);
+    if ($raw === null) {
+        jsonError('ไม่สามารถเชื่อมต่อ RMS: ' . $fetchErr, 502);
     }
 
     $people = json_decode($raw, true);
     if (!is_array($people)) {
-        jsonError('RMS ส่งข้อมูลไม่ถูกต้อง (ไม่ใช่ JSON array)', 502);
+        jsonError('RMS ส่งข้อมูลไม่ถูกต้อง (ไม่ใช่ JSON array) — ได้รับ: ' . mb_substr($raw, 0, 120), 502);
     }
 
-    /* ── ตรวจสอบ hash เทียบกับครั้งล่าสุด ── */
+    /* ── ตรวจสอบ hash ── */
     $newHash = md5($raw);
     $log     = getLastLog($db);
 
     if (!$force && $log && $log['data_hash'] === $newHash) {
-        /* ข้อมูลไม่เปลี่ยน — ไม่ sync */
         jsonOk([
-            'synced'   => false,
-            'reason'   => 'ข้อมูลไม่มีการเปลี่ยนแปลง',
+            'synced'         => false,
+            'reason'         => 'ข้อมูลไม่มีการเปลี่ยนแปลง',
             'last_synced_at' => $log['synced_at'],
         ]);
     }
 
     /* ── ทำการ sync ── */
-    $result = doSync($db, $people);
+    try {
+        $result = doSync($db, $people);
+    } catch (\Throwable $e) {
+        jsonError('เกิดข้อผิดพลาดระหว่าง sync: ' . $e->getMessage(), 500);
+    }
+
     saveLog($db, $newHash, $result);
 
     jsonOk([
-        'synced'     => true,
-        'added'      => $result['added'],
-        'updated'    => $result['updated'],
-        'deleted'    => $result['deleted'],
-        'skipped'    => $result['skipped'],
-        'errors'     => $result['errors'],
-        'synced_at'  => gmdate('Y-m-d H:i:s'),
+        'synced'    => true,
+        'added'     => $result['added'],
+        'updated'   => $result['updated'],
+        'deleted'   => $result['deleted'],
+        'skipped'   => $result['skipped'],
+        'errors'    => $result['errors'],
+        'synced_at' => gmdate('Y-m-d H:i:s'),
     ]);
 }
 
@@ -75,13 +91,49 @@ jsonError('Method not allowed', 405);
 
 /* ═══════════════════════════════════════════════════════════ */
 
+/**
+ * ดึง URL โดยลอง cURL ก่อน แล้ว fallback ไป file_get_contents
+ * @return array{0: string|null, 1: string}  [body|null, errorMsg]
+ */
+function fetchUrl(string $url): array
+{
+    /* ลอง cURL ก่อน */
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_SSL_VERIFYPEER => false,   // ผ่อนปรนสำหรับ self-signed cert
+            CURLOPT_USERAGENT      => 'RVCMeet/1.0',
+        ]);
+        $body = curl_exec($ch);
+        $err  = curl_error($ch);
+        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($body !== false && $code >= 200 && $code < 300) {
+            return [$body, ''];
+        }
+        $curlErr = $err ?: "HTTP $code";
+    } else {
+        $curlErr = 'curl ไม่พร้อมใช้งาน';
+    }
+
+    /* fallback: file_get_contents */
+    if (ini_get('allow_url_fopen')) {
+        $ctx  = stream_context_create(['http' => ['timeout' => 15, 'ignore_errors' => true]]);
+        $body = @file_get_contents($url, false, $ctx);
+        if ($body !== false) return [$body, ''];
+    }
+
+    return [null, $curlErr];
+}
+
 function doSync(PDO $db, array $people): array
 {
     $added = $updated = $deleted = $skipped = 0;
     $errors = [];
-
-    /* รายชื่อ username ที่ยัง active จาก RMS */
-    $activeFromRms = [];
 
     foreach ($people as $p) {
         $username = trim((string)($p['people_id']      ?? ''));
@@ -92,19 +144,17 @@ function doSync(PDO $db, array $people): array
 
         if ($username === '') continue;
 
-        /* people_exit ต้องว่าง/null/0 จึงจะ import */
-        $isActive = ($exit === '' || $exit === '0' || $exit === null);
+        /* people_exit ว่าง/null/0 = ยังอยู่ */
+        $isActive = ($exit === '' || $exit === '0');
 
-        /* ดึงข้อมูลเดิมในระบบ */
         $existing = getExistingUser($db, $username);
 
         if (!$isActive) {
-            /* ออกจากงานแล้ว: ลบออกถ้ามีในระบบ */
             if ($existing) {
                 /* ไม่ลบ admin คนสุดท้าย */
                 if ($existing['permission'] === 'admin') {
-                    $adminCount = (int)$db->query("SELECT COUNT(*) FROM users WHERE permission='admin'")->fetchColumn();
-                    if ($adminCount <= 1) { $skipped++; continue; }
+                    $cnt = (int)$db->query("SELECT COUNT(*) FROM users WHERE permission='admin'")->fetchColumn();
+                    if ($cnt <= 1) { $skipped++; continue; }
                 }
                 $db->prepare('DELETE FROM users WHERE username = ?')->execute([$username]);
                 $deleted++;
@@ -114,22 +164,20 @@ function doSync(PDO $db, array $people): array
             continue;
         }
 
-        $activeFromRms[] = $username;
         $name = trim("$fname $lname") ?: $username;
 
         if ($existing) {
-            /* อัพเดต — เก็บ role/permission เดิม, อัพเดต name และ password */
-            $hash = $rawPass !== '' ? password_hash($rawPass, PASSWORD_BCRYPT, ['cost' => 12]) : null;
-            if ($hash) {
-                $db->prepare(
-                    'UPDATE users SET name=?, password_hash=? WHERE username=?'
-                )->execute([$name, $hash, $username]);
+            /* อัพเดต — เก็บ role/permission เดิม */
+            if ($rawPass !== '') {
+                $hash = password_hash($rawPass, PASSWORD_BCRYPT, ['cost' => 12]);
+                $db->prepare('UPDATE users SET name=?, password_hash=? WHERE username=?')
+                   ->execute([$name, $hash, $username]);
             } else {
-                $db->prepare('UPDATE users SET name=? WHERE username=?')->execute([$name, $username]);
+                $db->prepare('UPDATE users SET name=? WHERE username=?')
+                   ->execute([$name, $username]);
             }
             $updated++;
         } else {
-            /* เพิ่มใหม่ */
             if ($rawPass === '') { $skipped++; continue; }
             $hash = password_hash($rawPass, PASSWORD_BCRYPT, ['cost' => 12]);
             try {
@@ -180,6 +228,6 @@ function saveLog(PDO $db, string $hash, array $result): void
          VALUES (UTC_TIMESTAMP(), ?, ?, ?, ?, ?)'
     )->execute([$hash, $result['added'], $result['updated'], $result['deleted'], $result['skipped']]);
 
-    /* เก็บแค่ 100 รายการล่าสุด */
-    $db->exec('DELETE FROM rms_sync_log WHERE id NOT IN (SELECT id FROM (SELECT id FROM rms_sync_log ORDER BY id DESC LIMIT 100) t)');
+    $db->exec('DELETE FROM rms_sync_log WHERE id NOT IN
+        (SELECT id FROM (SELECT id FROM rms_sync_log ORDER BY id DESC LIMIT 100) t)');
 }

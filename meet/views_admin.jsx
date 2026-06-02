@@ -647,11 +647,28 @@ function UserManagement({ currentUser }) {
     setRmsSyncing(true);
     setRmsError("");
     try {
+      /* ── Step 1: browser ดึงข้อมูลจาก RMS โดยตรง ── */
+      const rmsUrl = rmsStatus?.rms_url;
+      if (!rmsUrl) { setRmsError("ไม่ทราบ URL ของ RMS กรุณา reload หน้า"); return; }
+
+      let people;
+      try {
+        const rmsRes = await fetch(rmsUrl, { mode: "cors" });
+        if (!rmsRes.ok) throw new Error(`HTTP ${rmsRes.status}`);
+        const rmsText = await rmsRes.text();
+        people = JSON.parse(rmsText);
+        if (!Array.isArray(people)) throw new Error("ข้อมูล RMS ไม่ใช่ array");
+      } catch (e) {
+        setRmsError("ดึงข้อมูลจาก RMS ไม่ได้: " + e.message);
+        return;
+      }
+
+      /* ── Step 2: ส่ง people array ให้ PHP ประมวลผล ── */
       const res  = await fetch("api/rms_sync.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify({ force }),
+        body: JSON.stringify({ force, people }),
       });
       const text = await res.text();
       let data;
@@ -671,7 +688,7 @@ function UserManagement({ currentUser }) {
         setRmsError(data.error ?? "เกิดข้อผิดพลาด");
       }
     } catch (e) {
-      setRmsError("fetch ล้มเหลว: " + e.message);
+      setRmsError("เกิดข้อผิดพลาด: " + e.message);
     } finally {
       setRmsSyncing(false);
     }

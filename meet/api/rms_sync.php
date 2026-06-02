@@ -23,7 +23,7 @@ try {
     jsonError('ไม่สามารถเชื่อมต่อฐานข้อมูล: ' . $e->getMessage());
 }
 
-/* ── GET: คืนสถานะ sync ล่าสุด ── */
+/* ── GET: คืนสถานะ sync ล่าสุด และ RMS URL ── */
 if ($method === 'GET') {
     $log = getLastLog($db);
     jsonOk([
@@ -34,6 +34,7 @@ if ($method === 'GET') {
         'deleted'        => (int)($log['deleted'] ?? 0),
         'skipped'        => (int)($log['skipped'] ?? 0),
         'interval_sec'   => RMS_AUTO_SYNC_INTERVAL,
+        'rms_url'        => rtrim(RMS_BASE_URL, '/') . '/' . ltrim(RMS_PEOPLE_PATH, '/'),
     ]);
 }
 
@@ -42,17 +43,24 @@ if ($method === 'POST') {
     $body  = json_decode((string)file_get_contents('php://input'), true) ?? [];
     $force = (bool)($body['force'] ?? false);
 
-    /* ── ดึงข้อมูลจาก RMS ── */
-    $url = rtrim(RMS_BASE_URL, '/') . '/' . ltrim(RMS_PEOPLE_PATH, '/');
-    [$raw, $fetchErr] = fetchUrl($url);
+    /* ── รับข้อมูลจาก browser (client-side fetch) หรือดึงจาก server ── */
+    if (isset($body['people']) && is_array($body['people'])) {
+        /* browser ดึงมาให้แล้ว */
+        $people  = $body['people'];
+        $raw     = json_encode($people);
+    } else {
+        /* fallback: ดึงจาก server (ถ้า server เข้าถึง RMS ได้) */
+        $url = rtrim(RMS_BASE_URL, '/') . '/' . ltrim(RMS_PEOPLE_PATH, '/');
+        [$raw, $fetchErr] = fetchUrl($url);
 
-    if ($raw === null) {
-        jsonError('ไม่สามารถเชื่อมต่อ RMS: ' . $fetchErr);   // 400 — ไม่ใช้ 5xx เพื่อหลีกเลี่ยง proxy แทนที่ response
-    }
+        if ($raw === null) {
+            jsonError('ไม่สามารถเชื่อมต่อ RMS: ' . $fetchErr);
+        }
 
-    $people = json_decode($raw, true);
-    if (!is_array($people)) {
-        jsonError('RMS ส่งข้อมูลไม่ถูกต้อง (ไม่ใช่ JSON array) — ได้รับ: ' . mb_substr($raw, 0, 120));
+        $people = json_decode($raw, true);
+        if (!is_array($people)) {
+            jsonError('RMS ส่งข้อมูลไม่ถูกต้อง: ' . mb_substr($raw, 0, 120));
+        }
     }
 
     /* ── ตรวจสอบ hash ── */

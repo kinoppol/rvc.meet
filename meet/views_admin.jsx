@@ -637,15 +637,15 @@ function UserManagement({ currentUser }) {
       const lastMs  = rmsStatus.last_synced_at ? new Date(rmsStatus.last_synced_at + 'Z').getTime() : 0;
       const interval = (rmsStatus.interval_sec ?? 3600) * 1000;
       if (Date.now() - lastMs >= interval) {
-        setRmsModal(true); // เปิด modal ให้ผู้ใช้วาง JSON เมื่อถึงเวลา
+        doRmsSync(null, false); // auto-sync ไม่ force
       }
     };
     const t = setInterval(check, 60 * 1000); // ตรวจทุกนาที
     return () => clearInterval(t);
   }, [rmsStatus]);
 
-  /* ส่ง people array (ที่ได้จาก RMS) ให้ PHP ประมวลผล */
-  const doRmsSync = async (people, force = true) => {
+  /* sync หลัก — PHP ดึงจาก RMS เอง หรือรับ people[] จาก browser */
+  const doRmsSync = async (people = null, force = true) => {
     setRmsSyncing(true);
     setRmsError("");
     try {
@@ -653,7 +653,7 @@ function UserManagement({ currentUser }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify({ force, people }),
+        body: JSON.stringify(people ? { force, people } : { force }),
       });
       const text = await res.text();
       let data;
@@ -670,7 +670,9 @@ function UserManagement({ currentUser }) {
           setToast("RMS: " + (data.data.reason ?? "ไม่มีการเปลี่ยนแปลง"));
         }
       } else {
-        setRmsError(data.error ?? "เกิดข้อผิดพลาด");
+        /* ถ้า server ดึงจาก RMS ไม่ได้ → เสนอ manual modal */
+        const msg = data.error ?? "เกิดข้อผิดพลาด";
+        setRmsError(msg + (msg.includes("RMS") ? " — กด 'วาง JSON' เพื่อโอนด้วยตนเอง" : ""));
       }
     } catch (e) {
       setRmsError("เกิดข้อผิดพลาด: " + e.message);
@@ -726,10 +728,14 @@ function UserManagement({ currentUser }) {
           <div className="h-sub">บัญชีผู้ใช้ทั้งหมด {users.length} บัญชี</div>
         </div>
         <div className="row" style={{ gap:10, flexWrap:"wrap" }}>
-          <button className="btn btn-soft" onClick={() => { setRmsError(""); setRmsModal(true); }} disabled={rmsSyncing}
+          <button className="btn btn-soft" onClick={() => { setRmsError(""); doRmsSync(null, true); }} disabled={rmsSyncing}
             title="โอนข้อมูลบุคลากรจากระบบ RMS">
             <IcoUsers size={17} />
             {rmsSyncing ? "กำลังโอนข้อมูล…" : "โอนข้อมูลผู้ใช้จากระบบ RMS"}
+          </button>
+          <button className="btn btn-ghost btn-sm" onClick={() => { setRmsError(""); setRmsModal(true); }} disabled={rmsSyncing}
+            title="วาง JSON จาก RMS ด้วยตนเอง">
+            วาง JSON
           </button>
           <button className="btn btn-primary btn-lg"
             onClick={() => setModal({ mode:"create" })}>

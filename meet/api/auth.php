@@ -31,9 +31,15 @@ function handleLogin(): never
     }
 
     try {
-        $db   = getDB();
+        $db = getDB();
+
+        /* Auto-migrate: เพิ่ม permission column กรณียังไม่ได้รัน install.php
+           หลังอัปเดต ผู้ใช้เดิมทุกคนจะได้รับสิทธิ์ admin (เหมือนก่อนมีระบบ role) */
+        ensurePermissionColumn($db);
+
         $stmt = $db->prepare(
-            'SELECT id, username, password_hash, name, role, permission FROM users WHERE username = ? LIMIT 1'
+            'SELECT id, username, password_hash, name, role, permission
+             FROM users WHERE username = ? LIMIT 1'
         );
         $stmt->execute([$username]);
         $user = $stmt->fetch();
@@ -45,16 +51,16 @@ function handleLogin(): never
                 'username'   => $user['username'],
                 'name'       => $user['name'],
                 'role'       => $user['role'],
-                'permission' => $user['permission'] ?? 'staff',
+                'permission' => $user['permission'] ?? 'admin',
             ];
             jsonOk(['user' => $_SESSION['user']]);
         }
 
-        // Intentionally vague error to prevent username enumeration
+        // Intentionally vague – prevent username enumeration
         jsonError('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง', 401);
 
     } catch (PDOException $e) {
-        jsonError('Database error', 500);
+        jsonError('เกิดข้อผิดพลาดฐานข้อมูล: ' . $e->getMessage(), 500);
     }
 }
 
@@ -71,4 +77,29 @@ function handleLogout(): never
     }
     session_destroy();
     jsonOk(['message' => 'Logged out']);
+}
+
+/* ── Auto-migration ──────────────────────────────────
+   เพิ่ม `permission` column ถ้ายังไม่มี (upgrade path)
+   ผู้ใช้เดิมทั้งหมดจะได้ permission = 'admin' เพราะก่อน
+   มีระบบ role พวกเขาสามารถจัดการทุกอย่างได้อยู่แล้ว    */
+function ensurePermissionColumn(PDO $db): void
+{
+    static $checked = false;
+    if ($checked) return;
+    $checked = true;
+
+    try {
+        // ทดสอบว่า column มีอยู่แล้วหรือไม่
+        $db->query('SELECT permission FROM users LIMIT 0');
+    } catch (PDOException) {
+        // column ไม่มี → เพิ่มและตั้งค่า default ให้ผู้ใช้เดิม
+        $db->exec(
+            "ALTER TABLE `users`
+             ADD COLUMN `permission` VARCHAR(20) NOT NULL DEFAULT 'admin'
+             AFTER `role`"
+        );
+        // ผู้ใช้ใหม่ที่สร้างหลังนี้จะเป็น 'staff' (DEFAULT ใน install.php)
+        // แต่ผู้ใช้เดิมที่ถูก migrate ได้รับ 'admin' ถูกต้องแล้ว
+    }
 }

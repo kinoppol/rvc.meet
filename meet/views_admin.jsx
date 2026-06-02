@@ -601,19 +601,77 @@ function addMonths(d, n) { const x = new Date(d); x.setMonth(x.getMonth()+n); re
 
 /* ===================== USER MANAGEMENT ===================== */
 function UserManagement({ currentUser }) {
-  const [users,   setUsers]   = useS([]);
-  const [loading, setLoading] = useS(true);
-  const [modal,   setModal]   = useS(null);   // null | {mode:'create'} | {mode:'edit',user:{}}
-  const [delUser, setDelUser] = useS(null);
-  const [toast,   setToast]   = useS("");
-  const [q,       setQ]       = useS("");
+  const [users,      setUsers]      = useS([]);
+  const [loading,    setLoading]    = useS(true);
+  const [modal,      setModal]      = useS(null);   // null | {mode:'create'} | {mode:'edit',user:{}}
+  const [delUser,    setDelUser]    = useS(null);
+  const [toast,      setToast]      = useS("");
+  const [q,          setQ]          = useS("");
+  const [rmsStatus,  setRmsStatus]  = useS(null);
+  const [rmsSyncing, setRmsSyncing] = useS(false);
+  const [rmsError,   setRmsError]   = useS("");
+
+  const reloadUsers = () =>
+    fetch("api/users.php", { credentials:"same-origin" })
+      .then(r => r.json())
+      .then(d => { if (d.success) setUsers(d.data); });
 
   useE(() => {
     fetch("api/users.php", { credentials:"same-origin" })
       .then(r => r.json())
       .then(d => { if (d.success) setUsers(d.data); })
       .finally(() => setLoading(false));
+
+    /* โหลดสถานะ RMS sync ล่าสุด */
+    fetch("api/rms_sync.php", { credentials:"same-origin" })
+      .then(r => r.json())
+      .then(d => { if (d.success) setRmsStatus(d.data); })
+      .catch(() => {});
   }, []);
+
+  /* Auto-sync ทุกชั่วโมง */
+  useE(() => {
+    const check = () => {
+      if (!rmsStatus) return;
+      const lastMs  = rmsStatus.last_synced_at ? new Date(rmsStatus.last_synced_at + 'Z').getTime() : 0;
+      const interval = (rmsStatus.interval_sec ?? 3600) * 1000;
+      if (Date.now() - lastMs >= interval) {
+        doRmsSync(false);
+      }
+    };
+    const t = setInterval(check, 60 * 1000); // ตรวจทุกนาที
+    return () => clearInterval(t);
+  }, [rmsStatus]);
+
+  const doRmsSync = async (force = true) => {
+    setRmsSyncing(true);
+    setRmsError("");
+    try {
+      const res  = await fetch("api/rms_sync.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ force }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setRmsStatus(prev => ({ ...prev, ...data.data, last_synced_at: data.data.synced_at ?? prev?.last_synced_at }));
+        if (data.data.synced) {
+          const { added, updated, deleted } = data.data;
+          setToast(`โอนข้อมูล RMS สำเร็จ: เพิ่ม ${added} อัพเดต ${updated} ลบ ${deleted}`);
+          await reloadUsers();
+        } else {
+          setToast("RMS: " + (data.data.reason ?? "ไม่มีการเปลี่ยนแปลง"));
+        }
+      } else {
+        setRmsError(data.error ?? "เกิดข้อผิดพลาด");
+      }
+    } catch (e) {
+      setRmsError("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้");
+    } finally {
+      setRmsSyncing(false);
+    }
+  };
 
   const filtered = users.filter(u =>
     q === "" || (u.name + u.username + u.role + PERM_LABEL[u.permission])
@@ -661,11 +719,35 @@ function UserManagement({ currentUser }) {
           <div className="h-title">จัดการผู้ใช้</div>
           <div className="h-sub">บัญชีผู้ใช้ทั้งหมด {users.length} บัญชี</div>
         </div>
-        <button className="btn btn-primary btn-lg"
-          onClick={() => setModal({ mode:"create" })}>
-          <IcoPlus size={19} stroke="#fff" /> เพิ่มผู้ใช้
-        </button>
+        <div className="row" style={{ gap:10, flexWrap:"wrap" }}>
+          <button className="btn btn-soft" onClick={() => doRmsSync(true)} disabled={rmsSyncing}
+            title="ดึงข้อมูลบุคลากรจากระบบ RMS และโอนเข้าระบบ">
+            <IcoUsers size={17} stroke={rmsSyncing ? "var(--muted)" : undefined} />
+            {rmsSyncing ? "กำลังโอนข้อมูล…" : "โอนข้อมูลผู้ใช้จากระบบ RMS"}
+          </button>
+          <button className="btn btn-primary btn-lg"
+            onClick={() => setModal({ mode:"create" })}>
+            <IcoPlus size={19} stroke="#fff" /> เพิ่มผู้ใช้
+          </button>
+        </div>
       </div>
+
+      {/* RMS sync status */}
+      {(rmsStatus?.last_synced_at || rmsError) && (
+        <div className="card" style={{ padding:"10px 16px", marginBottom:16, fontSize:13, display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+          {rmsError
+            ? <><IcoX size={14} stroke="var(--red)" /><span style={{ color:"var(--red)" }}>{rmsError}</span></>
+            : <>
+                <IcoCheckCircle size={14} stroke="var(--green)" />
+                <span className="muted">อัพเดตล่าสุด:</span>
+                <span>{rmsStatus.last_synced_at ? fmtDateTime(rmsStatus.last_synced_at) : "—"}</span>
+                <span className="muted" style={{ marginLeft:8 }}>
+                  เพิ่ม {rmsStatus.added ?? 0} · อัพเดต {rmsStatus.updated ?? 0} · ลบ {rmsStatus.deleted ?? 0}
+                </span>
+              </>
+          }
+        </div>
+      )}
 
       {/* Role legend */}
       <div className="row wrap" style={{ gap:10, marginBottom:20 }}>

@@ -149,6 +149,12 @@
 [data-theme="dark"] .ftab { background: var(--bg-2); border-color: var(--line); color: var(--ink-2); }
 [data-theme="dark"] .ftab:hover { background: var(--surface); }
 [data-theme="dark"] .ftab.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+[data-theme="dark"] .cal-cell { background: var(--surface); }
+[data-theme="dark"] .cal-cell.out { background: var(--bg); }
+[data-theme="dark"] .cal-cell .cdate { color: var(--ink-2); }
+[data-theme="dark"] .cal-cell.out .cdate { color: var(--faint); }
+[data-theme="dark"] .cal-dow { color: var(--ink-2); }
+[data-theme="dark"] .cal-more { color: var(--muted); }
 [data-theme="dark"] .att-panel { background: var(--surface); border-color: var(--line); }
 [data-theme="dark"] .att-row { border-color: var(--line-2); }
 [data-theme="dark"] .att-manual-badge { background: var(--bg-2); }

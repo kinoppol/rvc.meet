@@ -54,15 +54,14 @@ function UserDropdown({ auth, expireAt, onLogout }) {
 
   return (
     <div className="user-dd-wrap" ref={ref}>
-      {/* Trigger */}
-      <button className="user-dd-trigger" onClick={() => setOpen(o => !o)}>
-        <div style={{ textAlign:"right", lineHeight:1.25 }}>
-          <div style={{ fontSize:13.5, fontWeight:600 }}>{auth.name}</div>
-          <div style={{ fontSize:11.5, color:"var(--muted)" }}>{PERM_LABEL[auth.permission] ?? auth.role}</div>
-        </div>
+      {/* Trigger: avatar + chevron เท่านั้น — ไม่มีข้อความล้น */}
+      <button className="user-dd-trigger" onClick={() => setOpen(o => !o)}
+        title={auth.name}>
         <Avatar name={auth.name} />
-        <IcoChevDown size={13} stroke="var(--muted)" style={{
-          transition:"transform .2s", transform: open ? "rotate(180deg)" : "rotate(0deg)", flexShrink:0
+        <IcoChevDown size={12} stroke="var(--muted)" style={{
+          transition:"transform .2s",
+          transform: open ? "rotate(180deg)" : "rotate(0deg)",
+          flexShrink: 0,
         }} />
       </button>
 
@@ -71,14 +70,11 @@ function UserDropdown({ auth, expireAt, onLogout }) {
         <div className="user-dd-panel">
           {/* Header */}
           <div className="user-dd-header">
-            <Avatar name={auth.name} size={42} />
+            <Avatar name={auth.name} size={40} />
             <div style={{ minWidth:0, flex:1 }}>
-              <div style={{ fontWeight:700, fontSize:15, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", color:"var(--ink)" }}>
-                {auth.name}
-              </div>
-              <div style={{ fontSize:11.5, color:"var(--muted)", marginTop:1 }}>{auth.username}</div>
-              <span className="chip" style={{ fontSize:11, padding:"1px 8px", marginTop:5, display:"inline-block",
-                background:permMeta.bg, color:permMeta.color }}>
+              <div className="user-dd-name">{auth.name}</div>
+              <div className="user-dd-username">{auth.username}</div>
+              <span className="user-dd-badge" style={{ color: permMeta.color }}>
                 {permMeta.label}
               </span>
             </div>
@@ -86,21 +82,22 @@ function UserDropdown({ auth, expireAt, onLogout }) {
 
           {/* Session info */}
           <div className="user-dd-section">
+            <hr className="user-dd-sep" />
             {remaining ? (
               <div className="user-dd-session-box">
-                <IcoClock size={16} stroke="var(--blue)" style={{ flexShrink:0, marginTop:1 }} />
+                <IcoClock size={16} stroke="var(--blue)" style={{ flexShrink:0, marginTop:2 }} />
                 <div>
-                  <div className="session-label">ลงชื่อค้างไว้ · หมดอายุใน</div>
-                  <div className="session-time">{remaining}</div>
-                  <div className="session-hint">ต่ออายุอัตโนมัติเมื่อเข้าใช้งาน</div>
+                  <div className="s-label">ลงชื่อค้างไว้ · หมดอายุใน</div>
+                  <div className="s-time">{remaining}</div>
+                  <div className="s-hint">ต่ออายุอัตโนมัติเมื่อเข้าใช้งาน</div>
                 </div>
               </div>
             ) : (
               <div className="user-dd-temp-box">
-                <IcoClock size={16} style={{ flexShrink:0 }} />
+                <IcoClock size={16} stroke="var(--muted)" style={{ flexShrink:0 }} />
                 <div>
-                  <div style={{ fontWeight:500, marginBottom:1 }}>เซสชันชั่วคราว</div>
-                  <div style={{ fontSize:11.5 }}>ออกจากระบบเมื่อปิดเบราว์เซอร์</div>
+                  <div style={{ fontWeight:500, fontSize:13 }}>เซสชันชั่วคราว</div>
+                  <div style={{ fontSize:11.5, marginTop:2 }}>ออกจากระบบเมื่อปิดเบราว์เซอร์</div>
                 </div>
               </div>
             )}

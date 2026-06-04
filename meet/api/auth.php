@@ -25,6 +25,7 @@ function handleLogin(): never
     $d        = jsonBody();
     $username = trim($d['username'] ?? '');
     $password = (string)($d['password'] ?? '');
+    $remember = (bool)($d['remember'] ?? false);
 
     if ($username === '' || $password === '') {
         jsonError('กรุณากรอกชื่อผู้ใช้และรหัสผ่าน', 422);
@@ -53,6 +54,13 @@ function handleLogin(): never
                 'role'       => $user['role'],
                 'permission' => $user['permission'] ?? 'admin',
             ];
+            $_SESSION['remember'] = $remember;
+
+            /* ตั้ง cookie 1 ปีทันทีถ้า remember = true */
+            if ($remember) {
+                renewRememberCookie();
+            }
+
             jsonOk(['user' => $_SESSION['user']]);
         }
 

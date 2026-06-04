@@ -17,14 +17,44 @@ defined('DB_CHARSET') || define('DB_CHARSET', 'utf8mb4');
 date_default_timezone_set('UTC');
 
 /* ── Session ─────────────────────────────────────────────────────── */
+const REMEMBER_LIFETIME = 365 * 24 * 3600; // 1 ปี (วินาที)
+
 if (session_status() === PHP_SESSION_NONE) {
+    /* gc_maxlifetime ต้องใหญ่พอสำหรับ remember-me */
+    ini_set('session.gc_maxlifetime', (string)REMEMBER_LIFETIME);
+
     session_set_cookie_params([
-        'lifetime' => 0,
+        'lifetime' => 0,   // browser-session โดย default; remember-me จะ override ทีหลัง
         'path'     => '/',
         'httponly' => true,
         'samesite' => 'Lax',
     ]);
     session_start();
+
+    /* ── ถ้า session นี้เป็น remember-me → ต่ออายุ cookie ทุก request ── */
+    if (!empty($_SESSION['remember'])) {
+        renewRememberCookie();
+    }
+}
+
+/**
+ * ตั้ง / ต่ออายุ session cookie เป็น 1 ปีนับจากตอนนี้
+ */
+function renewRememberCookie(): void
+{
+    $p = session_get_cookie_params();
+    setcookie(
+        session_name(),
+        session_id(),
+        [
+            'expires'  => time() + REMEMBER_LIFETIME,
+            'path'     => $p['path'],
+            'domain'   => $p['domain'],
+            'secure'   => $p['secure'],
+            'httponly' => $p['httponly'],
+            'samesite' => $p['samesite'] ?? 'Lax',
+        ]
+    );
 }
 
 /* ── Database connection (singleton) ─────────────────────────────── */

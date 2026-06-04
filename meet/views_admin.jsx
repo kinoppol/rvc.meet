@@ -11,11 +11,12 @@ const PERM_LABEL = { admin:"ผู้ดูแลระบบ", organizer:"ผ�
 
 /* ===================== LOGIN ===================== */
 function Login({ onLogin, onBack }) {
-  const [u,    setU]    = useS("");
-  const [p,    setP]    = useS("");
-  const [err,  setErr]  = useS("");
-  const [show, setShow] = useS(false);
-  const [busy, setBusy] = useS(false);
+  const [u,        setU]        = useS("");
+  const [p,        setP]        = useS("");
+  const [err,      setErr]      = useS("");
+  const [show,     setShow]     = useS(false);
+  const [busy,     setBusy]     = useS(false);
+  const [remember, setRemember] = useS(false);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -27,7 +28,7 @@ function Login({ onLogin, onBack }) {
         method:      "POST",
         headers:     { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body:        JSON.stringify({ username: u.trim(), password: p }),
+        body:        JSON.stringify({ username: u.trim(), password: p, remember }),
       });
       const data = await res.json();
       if (data.success) {
@@ -104,6 +105,13 @@ function Login({ onLogin, onBack }) {
                 <IcoX size={14} /> {err}
               </div>
             )}
+
+            <label style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer", userSelect:"none", fontSize:14 }}>
+              <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)}
+                style={{ width:16, height:16, cursor:"pointer", accentColor:"var(--blue)" }} />
+              <span>ลงชื่อค้างไว้ในอุปกรณ์นี้</span>
+              <span className="muted" style={{ fontSize:12 }}>(1 ปี)</span>
+            </label>
 
             <button className="btn btn-primary btn-lg btn-block" type="submit"
               disabled={busy} style={{ marginTop:4 }}>

@@ -1,5 +1,5 @@
 /* app.jsx — shell, routing, topbar. PHP API-backed version. */
-const { useState: useSt, useEffect: useEf } = React;
+const { useState: useSt, useEffect: useEf, useRef: useRf } = React;
 
 /* ── Theme management ─────────────────────────────── */
 const THEME_CYCLE  = ['system', 'light', 'dark'];
@@ -22,10 +22,119 @@ applyTheme(localStorage.getItem('theme') || 'system');
 const isAdmin     = (auth) => auth?.permission === 'admin';
 const canManage   = (auth) => auth?.permission === 'admin' || auth?.permission === 'organizer';
 
+/* ── Session countdown helper ────────────────────────────── */
+function fmtRemaining(expireAt) {
+  if (!expireAt) return null;
+  const secs = Math.floor(expireAt - Date.now() / 1000);
+  if (secs <= 0) return "หมดอายุแล้ว";
+  const d = Math.floor(secs / 86400);
+  const h = Math.floor((secs % 86400) / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  if (d > 0)  return `${d} วัน ${h} ชั่วโมง`;
+  if (h > 0)  return `${h} ชั่วโมง ${m} นาที`;
+  return `${m} นาที`;
+}
+
+/* ── User dropdown ───────────────────────────────────────── */
+function UserDropdown({ auth, expireAt, onLogout }) {
+  const [open, setOpen] = useSt(false);
+  const now             = useNow(60000);  // อัพเดตทุก 1 นาที
+  const ref             = useRf(null);
+
+  /* ปิด dropdown เมื่อคลิกนอก */
+  useEf(() => {
+    if (!open) return;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const remaining = expireAt ? fmtRemaining(expireAt) : null;
+  const permMeta  = PERM_META[auth.permission] || PERM_META.staff;
+
+  return (
+    <div className="user-dd-wrap" ref={ref}>
+      {/* Trigger */}
+      <button className="user-dd-trigger" onClick={() => setOpen(o => !o)}>
+        <div style={{ textAlign:"right", lineHeight:1.2 }}>
+          <div style={{ fontSize:13.5, fontWeight:600 }}>{auth.name}</div>
+          <div style={{ fontSize:11.5, color:"var(--muted)" }}>
+            {PERM_LABEL[auth.permission] ?? auth.role}
+          </div>
+        </div>
+        <Avatar name={auth.name} />
+        <span style={{ color:"var(--muted)", marginLeft:-2 }}>
+          <IcoChevDown size={14} />
+        </span>
+      </button>
+
+      {/* Dropdown panel */}
+      {open && (
+        <div className="user-dd-panel">
+          {/* Header */}
+          <div className="user-dd-header">
+            <Avatar name={auth.name} size={40} />
+            <div style={{ minWidth:0 }}>
+              <div style={{ fontWeight:700, fontSize:15, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                {auth.name}
+              </div>
+              <span className="chip" style={{ fontSize:11, padding:"1px 8px", background:permMeta.bg, color:permMeta.color, marginTop:4, display:"inline-block" }}>
+                {permMeta.label}
+              </span>
+            </div>
+          </div>
+
+          <div className="user-dd-divider" />
+
+          {/* Session info */}
+          <div className="user-dd-section">
+            <div className="user-dd-row">
+              <IcoShield size={15} style={{ flexShrink:0 }} />
+              <span className="muted" style={{ fontSize:12.5 }}>สถานะเซสชัน</span>
+            </div>
+            {remaining ? (
+              <div className="user-dd-row" style={{ gap:6 }}>
+                <IcoClock size={15} style={{ flexShrink:0, color:"var(--blue)" }} />
+                <div>
+                  <span style={{ fontSize:13, fontWeight:600 }}>ออกจากระบบอัตโนมัติใน</span>
+                  <div style={{ fontSize:12, color:"var(--blue)", fontWeight:700, marginTop:1 }}>
+                    {remaining}
+                  </div>
+                  <div style={{ fontSize:11, color:"var(--muted)", marginTop:1 }}>
+                    (ต่ออายุอัตโนมัติเมื่อใช้งาน)
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="user-dd-row" style={{ gap:6 }}>
+                <IcoClock size={15} style={{ flexShrink:0, color:"var(--muted)" }} />
+                <div>
+                  <span style={{ fontSize:13 }}>เซสชันชั่วคราว</span>
+                  <div style={{ fontSize:11, color:"var(--muted)", marginTop:1 }}>
+                    ออกจากระบบเมื่อปิดเบราว์เซอร์
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="user-dd-divider" />
+
+          {/* Logout */}
+          <div style={{ padding:"6px 8px" }}>
+            <button className="user-dd-logout" onClick={() => { setOpen(false); onLogout(); }}>
+              <IcoLogout size={16} /> ออกจากระบบ
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Topbar ──────────────────────────────────────────────── */
-function Topbar({ auth, view, go, onLogout, theme, onCycleTheme }) {
+function Topbar({ auth, expireAt, view, go, onLogout, theme, onCycleTheme }) {
   const now   = useNow(1000);
-  const p     = auth?.permission;
   const ThIco = THEME_ICONS[theme] || IcoMonitor;
 
   const navItems = [
@@ -67,18 +176,7 @@ function Topbar({ auth, view, go, onLogout, theme, onCycleTheme }) {
       </button>
 
       {auth ? (
-        <div className="row" style={{ gap:10, marginLeft:8 }}>
-          <div style={{ textAlign:"right", lineHeight:1.2 }}>
-            <div style={{ fontSize:13.5, fontWeight:600 }}>{auth.name}</div>
-            <div style={{ fontSize:11.5, color:"var(--muted)" }}>
-              {PERM_LABEL[auth.permission] ?? auth.role}
-            </div>
-          </div>
-          <Avatar name={auth.name} />
-          <button className="icon-btn" title="ออกจากระบบ" onClick={onLogout}>
-            <IcoLogout size={20} />
-          </button>
-        </div>
+        <UserDropdown auth={auth} expireAt={expireAt} onLogout={onLogout} />
       ) : (
         <button className="btn btn-primary" style={{ marginLeft:8 }} onClick={() => go("login")}>
           <IcoLock size={17} stroke="#fff" /> เข้าสู่ระบบ
@@ -130,9 +228,10 @@ function ErrorScreen({ message }) {
 
 /* ── Main App ────────────────────────────────────────────── */
 function App() {
-  const [meetings, setMeetings] = useSt([]);
-  const [auth,     setAuth]     = useSt(null);
-  const [view,     setView]     = useSt("agenda");
+  const [meetings,  setMeetings]  = useSt([]);
+  const [auth,      setAuth]      = useSt(null);
+  const [expireAt,  setExpireAt]  = useSt(null);   // Unix timestamp (วินาที) สำหรับ remember-me
+  const [view,      setView]      = useSt("agenda");
   const [selected, setSelected] = useSt(null);
   const [editing,  setEditing]  = useSt(null);
   const [toast,    setToast]    = useSt("");
@@ -164,7 +263,10 @@ function App() {
       fetch("api/meetings.php", { credentials:"same-origin" }).then(r => r.json()),
     ])
       .then(([authRes, meetRes]) => {
-        if (authRes.success && authRes.data.user) setAuth(authRes.data.user);
+        if (authRes.success && authRes.data.user) {
+          setAuth(authRes.data.user);
+          if (authRes.data.expire_at) setExpireAt(authRes.data.expire_at);
+        }
         if (meetRes.success) setMeetings(meetRes.data);
         else setApiError("โหลดข้อมูลไม่ได้: " + (meetRes.error ?? ""));
       })
@@ -178,9 +280,9 @@ function App() {
   const showToast = (m) => setToast(m);
 
   /* ── Auth ── */
-  const doLogin = (user) => {
+  const doLogin = (user, ea = null) => {
     setAuth(user);
-    // staff lands on agenda (ไม่มี dashboard), others go to dashboard
+    if (ea) setExpireAt(ea);
     go(user.permission === 'staff' ? "agenda" : "dashboard");
     showToast("เข้าสู่ระบบสำเร็จ");
   };
@@ -188,6 +290,7 @@ function App() {
   const doLogout = async () => {
     await fetch("api/auth.php", { method:"DELETE", credentials:"same-origin" }).catch(() => {});
     setAuth(null);
+    setExpireAt(null);
     go("agenda");
   };
 
@@ -275,7 +378,7 @@ function App() {
   return (
     <div className="app">
       {view !== "login" && (
-        <Topbar auth={auth} view={view} go={go} onLogout={doLogout}
+        <Topbar auth={auth} expireAt={expireAt} view={view} go={go} onLogout={doLogout}
           theme={theme} onCycleTheme={cycleTheme} />
       )}
 

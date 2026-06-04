@@ -42,12 +42,15 @@ if (session_status() === PHP_SESSION_NONE) {
  */
 function renewRememberCookie(): void
 {
+    $expireAt = time() + REMEMBER_LIFETIME;
+    $_SESSION['expire_at'] = $expireAt;           // เก็บไว้ส่งให้ frontend
+
     $p = session_get_cookie_params();
     setcookie(
         session_name(),
         session_id(),
         [
-            'expires'  => time() + REMEMBER_LIFETIME,
+            'expires'  => $expireAt,
             'path'     => $p['path'],
             'domain'   => $p['domain'],
             'secure'   => $p['secure'],

@@ -16,7 +16,12 @@ match ($method) {
 /* ── GET: return currently logged-in user (or null) ── */
 function handleCheck(): never
 {
-    jsonOk(['user' => $_SESSION['user'] ?? null]);
+    $extra = [];
+    if (!empty($_SESSION['remember'])) {
+        $extra['remember']   = true;
+        $extra['expire_at']  = $_SESSION['expire_at'] ?? null;
+    }
+    jsonOk(['user' => $_SESSION['user'] ?? null] + $extra);
 }
 
 /* ── POST: authenticate and start session ─────────── */
@@ -61,7 +66,10 @@ function handleLogin(): never
                 renewRememberCookie();
             }
 
-            jsonOk(['user' => $_SESSION['user']]);
+            $extra = $remember
+                ? ['remember' => true, 'expire_at' => $_SESSION['expire_at'] ?? null]
+                : [];
+            jsonOk(['user' => $_SESSION['user']] + $extra);
         }
 
         // Intentionally vague – prevent username enumeration

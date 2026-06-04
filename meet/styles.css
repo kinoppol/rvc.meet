@@ -458,6 +458,46 @@ input, select, textarea { font-family: inherit; }
 @keyframes toastin { from { opacity: 0; transform: translate(-50%, 12px); } to { opacity: 1; transform: translate(-50%, 0); } }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── User dropdown ───────────────────────────────────────── */
+.user-dd-wrap { position: relative; margin-left: 8px; }
+
+.user-dd-trigger {
+  display: flex; align-items: center; gap: 8px;
+  background: none; border: none; cursor: pointer;
+  padding: 6px 8px; border-radius: var(--radius);
+  transition: background .15s;
+  color: var(--ink);
+}
+.user-dd-trigger:hover { background: var(--bg-2); }
+
+.user-dd-panel {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  width: 280px;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+  z-index: 200;
+  animation: ddopen .15s ease;
+}
+@keyframes ddopen { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+
+.user-dd-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 16px 14px;
+}
+.user-dd-divider { border: none; border-top: 1px solid var(--line); margin: 0; }
+
+.user-dd-section { padding: 10px 16px 12px; display: flex; flex-direction: column; gap: 8px; }
+.user-dd-row { display: flex; align-items: flex-start; gap: 8px; color: var(--ink-2); }
+
+.user-dd-logout {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  background: none; border: none; cursor: pointer;
+  padding: 8px 10px; border-radius: var(--radius);
+  color: var(--red); font-size: 14px; font-weight: 500;
+  transition: background .15s;
+}
+.user-dd-logout:hover { background: var(--red-50); }
+
 /* modal */
 .modal-bg { position: fixed; inset: 0; background: rgba(32,33,36,.5); backdrop-filter: blur(2px); z-index: 150; display: flex; align-items: center; justify-content: center; padding: 24px; animation: fade .2s; }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }

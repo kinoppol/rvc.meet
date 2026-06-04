@@ -32,7 +32,7 @@ function Login({ onLogin, onBack }) {
       });
       const data = await res.json();
       if (data.success) {
-        onLogin(data.data.user);
+        onLogin(data.data.user, data.data.expire_at ?? null);
       } else {
         setErr(data.error ?? "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
       }

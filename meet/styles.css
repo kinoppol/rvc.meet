@@ -459,44 +459,103 @@ input, select, textarea { font-family: inherit; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── User dropdown ───────────────────────────────────────── */
-.user-dd-wrap { position: relative; margin-left: 8px; }
+.user-dd-wrap { position: relative; margin-left: 4px; }
 
 .user-dd-trigger {
   display: flex; align-items: center; gap: 8px;
   background: none; border: none; cursor: pointer;
-  padding: 6px 8px; border-radius: var(--radius);
+  padding: 5px 10px 5px 8px; border-radius: 40px;
   transition: background .15s;
   color: var(--ink);
+  height: 44px;
 }
-.user-dd-trigger:hover { background: var(--bg-2); }
+.user-dd-trigger:hover  { background: rgba(0,0,0,.06); }
+.user-dd-trigger:active { background: rgba(0,0,0,.10); }
+[data-theme="dark"] .user-dd-trigger:hover  { background: rgba(255,255,255,.08); }
+[data-theme="dark"] .user-dd-trigger:active { background: rgba(255,255,255,.12); }
 
 .user-dd-panel {
-  position: absolute; top: calc(100% + 8px); right: 0;
-  width: 280px;
-  background: var(--card); border: 1px solid var(--line);
-  border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
-  z-index: 200;
-  animation: ddopen .15s ease;
+  position: absolute; top: calc(100% + 6px); right: 0;
+  width: 288px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
+  z-index: 300;
+  animation: ddopen .18s cubic-bezier(.22,.68,0,1.2);
+  overflow: hidden;
 }
-@keyframes ddopen { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+@keyframes ddopen {
+  from { opacity: 0; transform: translateY(-8px) scale(.97); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);   }
+}
 
 .user-dd-header {
   display: flex; align-items: center; gap: 12px;
-  padding: 16px 16px 14px;
+  padding: 18px 16px 14px;
+  background: linear-gradient(135deg, var(--blue-50) 0%, transparent 70%);
 }
+[data-theme="dark"] .user-dd-header {
+  background: linear-gradient(135deg, rgba(26,115,232,.15) 0%, transparent 70%);
+}
+
 .user-dd-divider { border: none; border-top: 1px solid var(--line); margin: 0; }
 
-.user-dd-section { padding: 10px 16px 12px; display: flex; flex-direction: column; gap: 8px; }
-.user-dd-row { display: flex; align-items: flex-start; gap: 8px; color: var(--ink-2); }
+.user-dd-section {
+  padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+
+.user-dd-row {
+  display: flex; align-items: flex-start; gap: 9px;
+  color: var(--ink-2);
+  padding: 4px 2px;
+}
+
+.user-dd-session-box {
+  background: var(--blue-50);
+  border: 1px solid var(--blue-100);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex; gap: 10px; align-items: flex-start;
+}
+[data-theme="dark"] .user-dd-session-box {
+  background: rgba(26,115,232,.12);
+  border-color: rgba(26,115,232,.25);
+}
+
+.user-dd-session-box .session-label {
+  font-size: 12px; color: var(--muted); margin-bottom: 2px;
+}
+.user-dd-session-box .session-time {
+  font-size: 14px; font-weight: 700; color: var(--blue);
+}
+.user-dd-session-box .session-hint {
+  font-size: 11px; color: var(--muted); margin-top: 2px;
+}
+
+.user-dd-temp-box {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex; gap: 10px; align-items: center;
+  color: var(--muted); font-size: 13px;
+}
+[data-theme="dark"] .user-dd-temp-box { border-color: var(--line-2); }
 
 .user-dd-logout {
-  display: flex; align-items: center; gap: 8px; width: 100%;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%;
   background: none; border: none; cursor: pointer;
-  padding: 8px 10px; border-radius: var(--radius);
-  color: var(--red); font-size: 14px; font-weight: 500;
+  padding: 10px 14px; margin: 0;
+  border-top: 1px solid var(--line);
+  color: var(--red); font-size: 13.5px; font-weight: 500;
   transition: background .15s;
+  font-family: var(--font-body);
 }
 .user-dd-logout:hover { background: var(--red-50); }
+[data-theme="dark"] .user-dd-logout:hover { background: rgba(234,67,53,.12); }
 
 /* modal */
 .modal-bg { position: fixed; inset: 0; background: rgba(32,33,36,.5); backdrop-filter: blur(2px); z-index: 150; display: flex; align-items: center; justify-content: center; padding: 24px; animation: fade .2s; }

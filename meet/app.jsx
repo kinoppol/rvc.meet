@@ -56,16 +56,14 @@ function UserDropdown({ auth, expireAt, onLogout }) {
     <div className="user-dd-wrap" ref={ref}>
       {/* Trigger */}
       <button className="user-dd-trigger" onClick={() => setOpen(o => !o)}>
-        <div style={{ textAlign:"right", lineHeight:1.2 }}>
+        <div style={{ textAlign:"right", lineHeight:1.25 }}>
           <div style={{ fontSize:13.5, fontWeight:600 }}>{auth.name}</div>
-          <div style={{ fontSize:11.5, color:"var(--muted)" }}>
-            {PERM_LABEL[auth.permission] ?? auth.role}
-          </div>
+          <div style={{ fontSize:11.5, color:"var(--muted)" }}>{PERM_LABEL[auth.permission] ?? auth.role}</div>
         </div>
         <Avatar name={auth.name} />
-        <span style={{ color:"var(--muted)", marginLeft:-2 }}>
-          <IcoChevDown size={14} />
-        </span>
+        <IcoChevDown size={13} stroke="var(--muted)" style={{
+          transition:"transform .2s", transform: open ? "rotate(180deg)" : "rotate(0deg)", flexShrink:0
+        }} />
       </button>
 
       {/* Dropdown panel */}
@@ -73,59 +71,45 @@ function UserDropdown({ auth, expireAt, onLogout }) {
         <div className="user-dd-panel">
           {/* Header */}
           <div className="user-dd-header">
-            <Avatar name={auth.name} size={40} />
-            <div style={{ minWidth:0 }}>
-              <div style={{ fontWeight:700, fontSize:15, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+            <Avatar name={auth.name} size={42} />
+            <div style={{ minWidth:0, flex:1 }}>
+              <div style={{ fontWeight:700, fontSize:15, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", color:"var(--ink)" }}>
                 {auth.name}
               </div>
-              <span className="chip" style={{ fontSize:11, padding:"1px 8px", background:permMeta.bg, color:permMeta.color, marginTop:4, display:"inline-block" }}>
+              <div style={{ fontSize:11.5, color:"var(--muted)", marginTop:1 }}>{auth.username}</div>
+              <span className="chip" style={{ fontSize:11, padding:"1px 8px", marginTop:5, display:"inline-block",
+                background:permMeta.bg, color:permMeta.color }}>
                 {permMeta.label}
               </span>
             </div>
           </div>
 
-          <div className="user-dd-divider" />
-
           {/* Session info */}
           <div className="user-dd-section">
-            <div className="user-dd-row">
-              <IcoShield size={15} style={{ flexShrink:0 }} />
-              <span className="muted" style={{ fontSize:12.5 }}>สถานะเซสชัน</span>
-            </div>
             {remaining ? (
-              <div className="user-dd-row" style={{ gap:6 }}>
-                <IcoClock size={15} style={{ flexShrink:0, color:"var(--blue)" }} />
+              <div className="user-dd-session-box">
+                <IcoClock size={16} stroke="var(--blue)" style={{ flexShrink:0, marginTop:1 }} />
                 <div>
-                  <span style={{ fontSize:13, fontWeight:600 }}>ออกจากระบบอัตโนมัติใน</span>
-                  <div style={{ fontSize:12, color:"var(--blue)", fontWeight:700, marginTop:1 }}>
-                    {remaining}
-                  </div>
-                  <div style={{ fontSize:11, color:"var(--muted)", marginTop:1 }}>
-                    (ต่ออายุอัตโนมัติเมื่อใช้งาน)
-                  </div>
+                  <div className="session-label">ลงชื่อค้างไว้ · หมดอายุใน</div>
+                  <div className="session-time">{remaining}</div>
+                  <div className="session-hint">ต่ออายุอัตโนมัติเมื่อเข้าใช้งาน</div>
                 </div>
               </div>
             ) : (
-              <div className="user-dd-row" style={{ gap:6 }}>
-                <IcoClock size={15} style={{ flexShrink:0, color:"var(--muted)" }} />
+              <div className="user-dd-temp-box">
+                <IcoClock size={16} style={{ flexShrink:0 }} />
                 <div>
-                  <span style={{ fontSize:13 }}>เซสชันชั่วคราว</span>
-                  <div style={{ fontSize:11, color:"var(--muted)", marginTop:1 }}>
-                    ออกจากระบบเมื่อปิดเบราว์เซอร์
-                  </div>
+                  <div style={{ fontWeight:500, marginBottom:1 }}>เซสชันชั่วคราว</div>
+                  <div style={{ fontSize:11.5 }}>ออกจากระบบเมื่อปิดเบราว์เซอร์</div>
                 </div>
               </div>
             )}
           </div>
 
-          <div className="user-dd-divider" />
-
           {/* Logout */}
-          <div style={{ padding:"6px 8px" }}>
-            <button className="user-dd-logout" onClick={() => { setOpen(false); onLogout(); }}>
-              <IcoLogout size={16} /> ออกจากระบบ
-            </button>
-          </div>
+          <button className="user-dd-logout" onClick={() => { setOpen(false); onLogout(); }}>
+            <IcoLogout size={15} /> ออกจากระบบ
+          </button>
         </div>
       )}
     </div>

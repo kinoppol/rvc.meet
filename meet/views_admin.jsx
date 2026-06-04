@@ -221,8 +221,11 @@ function MeetingForm({ initial, onSave, onCancel }) {
     platform:"meet", link:"", location:"", attachments:[],
   };
   /* แยก dept กับ ชื่อแผนก ออกจากกัน เมื่อโหลดจาก initial */
-  const initDept = initial?.dept?.startsWith("section:") ? "section" : (initial?.dept ?? "director");
+  const initDept = initial?.dept?.startsWith("section:") ? "section"
+                 : initial?.dept?.startsWith("other:")   ? "other"
+                 : (initial?.dept ?? "director");
   const initSect = initial?.dept?.startsWith("section:") ? initial.dept.slice(8) : "";
+  const initOther = initial?.dept?.startsWith("other:")  ? initial.dept.slice(6)  : "";
 
   const [f,    setF]    = useS({
     ...def,
@@ -230,7 +233,8 @@ function MeetingForm({ initial, onSave, onCancel }) {
     start: initial ? toInputLocal(new Date(initial.start)) : def.start,
     end:   initial ? toInputLocal(new Date(initial.end))   : def.end,
   });
-  const [sectName, setSectName] = useS(initSect);
+  const [sectName,  setSectName]  = useS(initSect);
+  const [otherName, setOtherName] = useS(initOther);
   const [errs, setErrs] = useS({});
   const set = (k, v) => setF(prev => ({ ...prev, [k]: v }));
 
@@ -249,9 +253,9 @@ function MeetingForm({ initial, onSave, onCancel }) {
 
   const submit = () => {
     if (!validate()) return;
-    const finalDept = f.dept === "section"
-      ? "section:" + sectName.trim()
-      : f.dept;
+    const finalDept = f.dept === "section" ? "section:" + sectName.trim()
+                    : f.dept === "other"   ? "other:"   + otherName.trim()
+                    : f.dept;
     onSave({
       ...f,
       dept:      finalDept,
@@ -363,7 +367,12 @@ function MeetingForm({ initial, onSave, onCancel }) {
 
           <div className="field">
             <label>ฝ่ายงาน/หน่วยงานที่เกี่ยวข้อง</label>
-            <select className="select" value={f.dept} onChange={e => { set("dept", e.target.value); if (e.target.value !== "section") setSectName(""); }}>
+            <select className="select" value={f.dept} onChange={e => {
+              const v = e.target.value;
+              set("dept", v);
+              if (v !== "section") setSectName("");
+              if (v !== "other")   setOtherName("");
+            }}>
               {(() => {
                 const groups = [];
                 const seen = {};
@@ -379,14 +388,14 @@ function MeetingForm({ initial, onSave, onCancel }) {
               })()}
             </select>
             {f.dept === "section" && (
-              <input
-                className="input"
-                style={{ marginTop: 8 }}
+              <input className="input" style={{ marginTop:8 }} autoFocus
                 placeholder="ระบุชื่อแผนกวิชา เช่น ช่างยนต์, การบัญชี, คอมพิวเตอร์ธุรกิจ"
-                value={sectName}
-                autoFocus
-                onChange={e => setSectName(e.target.value)}
-              />
+                value={sectName} onChange={e => setSectName(e.target.value)} />
+            )}
+            {f.dept === "other" && (
+              <input className="input" style={{ marginTop:8 }} autoFocus
+                placeholder="ระบุหน่วยงาน/กิจกรรมอื่น ๆ"
+                value={otherName} onChange={e => setOtherName(e.target.value)} />
             )}
           </div>
           <div className="field">

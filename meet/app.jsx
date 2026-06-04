@@ -55,8 +55,8 @@ function UserDropdown({ auth, expireAt, onLogout }) {
   return (
     <div className="user-dd-wrap" ref={ref}>
       {/* Trigger: avatar + chevron เท่านั้น — ไม่มีข้อความล้น */}
-      <button className="user-dd-trigger" onClick={() => setOpen(o => !o)}
-        title={auth.name}>
+      <button className={"user-dd-trigger" + (open ? " is-open" : "")}
+        onClick={() => setOpen(o => !o)} title={auth.name}>
         <Avatar name={auth.name} />
         <IcoChevDown size={12} stroke="var(--muted)" style={{
           transition:"transform .2s",

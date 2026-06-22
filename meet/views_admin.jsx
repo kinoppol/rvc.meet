@@ -451,7 +451,7 @@ function MeetingForm({ initial, onSave, onCancel }) {
               </span>
             </button>
             {uploadErr && <span className="hint" style={{ color:"var(--red)", marginTop:6 }}>{uploadErr}</span>}
-            <span className="hint" style={{ marginTop:4 }}>ขนาดไฟล์สูงสุด 1 MB ต่อไฟล์</span>
+            <span className="hint" style={{ marginTop:4 }}>ขนาดไฟล์สูงสุด 10 MB ต่อไฟล์</span>
           </div>
         </div>
 

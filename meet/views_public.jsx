@@ -844,7 +844,16 @@ function MeetingDetail({ meeting, auth, onBack, admin, onEdit, onDelete, onGoLog
                 {meeting.attachments.map((f, i) => (
                   <div className="file-row" key={i}>
                     <span className="f-ic"><IcoFile size={18} /></span>
-                    <div className="grow"><div className="f-name">{f.name}</div><div className="f-size">{f.size}</div></div>
+                    {f.url
+                      ? (() => {
+                          const isPdf = f.name?.toLowerCase().endsWith(".pdf");
+                          return <a className="grow" href={f.url} target="_blank" rel="noreferrer" {...(!isPdf ? { download: f.name } : {})} style={{ textDecoration:"none", cursor:"pointer" }}>
+                            <div className="f-name" style={{ textDecoration:"underline", textUnderlineOffset:3 }}>{f.name}</div>
+                            <div className="f-size">{f.size}</div>
+                          </a>;
+                        })()
+                      : <div className="grow"><div className="f-name">{f.name}</div><div className="f-size">{f.size}</div></div>
+                    }
                     {f.url
                       ? (() => {
                           const isPdf = f.name?.toLowerCase().endsWith(".pdf");

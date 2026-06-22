@@ -277,7 +277,7 @@ function MeetingForm({ initial, onSave, onCancel }) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    if (file.size > 1 * 1024 * 1024) { setUploadErr("ขนาดไฟล์เกิน 1 MB"); return; }
+    if (file.size > 10 * 1024 * 1024) { setUploadErr("ขนาดไฟล์เกิน 10 MB"); return; }
     const ext = file.name.split(".").pop().toLowerCase();
     if (!["pdf","docx"].includes(ext)) { setUploadErr("อนุญาตเฉพาะ PDF และ DOCX"); return; }
 

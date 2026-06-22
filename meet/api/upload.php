@@ -12,9 +12,9 @@ if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
     jsonError('ไม่พบไฟล์หรือเกิดข้อผิดพลาดในการอัพโหลด', 400);
 }
 
-/* Validate size: 1 MB */
-if ($file['size'] > 1 * 1024 * 1024) {
-    jsonError('ขนาดไฟล์เกิน 1 MB', 400);
+/* Validate size: 10 MB */
+if ($file['size'] > 10 * 1024 * 1024) {
+    jsonError('ขนาดไฟล์เกิน 10 MB', 400);
 }
 
 /* Validate MIME type */

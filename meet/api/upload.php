@@ -9,7 +9,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') jsonError('Method not allowed', 405);
 
 $file = $_FILES['file'] ?? null;
 if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
-    jsonError('ไม่พบไฟล์หรือเกิดข้อผิดพลาดในการอัพโหลด', 400);
+    $code = $file['error'] ?? -1;
+    $map  = [1=>'INI_SIZE',2=>'FORM_SIZE',3=>'PARTIAL',4=>'NO_FILE',6=>'NO_TMP_DIR',7=>'CANT_WRITE',8=>'EXTENSION'];
+    jsonError('upload error: ' . ($map[$code] ?? "code=$code"), 400);
 }
 
 /* Validate size: 10 MB */
@@ -34,8 +36,11 @@ $storedName = bin2hex(random_bytes(12)) . '.' . $ext;
 $uploadDir  = __DIR__ . '/../uploads/';
 $destPath   = $uploadDir . $storedName;
 
+if (!is_dir($uploadDir)) {
+    mkdir($uploadDir, 0755, true);
+}
 if (!move_uploaded_file($file['tmp_name'], $destPath)) {
-    jsonError('ไม่สามารถบันทึกไฟล์ได้', 500);
+    jsonError('ไม่สามารถบันทึกไฟล์ได้ (path: ' . $uploadDir . ', writable: ' . (is_writable($uploadDir) ? 'yes' : 'no') . ')', 500);
 }
 
 /* Human-readable size */

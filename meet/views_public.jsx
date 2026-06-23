@@ -841,36 +841,45 @@ function MeetingDetail({ meeting, auth, onBack, admin, onEdit, onDelete, onGoLog
                 เอกสารวาระการประชุม
               </div>
               <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                {meeting.attachments.map((f, i) => (
-                  <div className="file-row" key={i}>
-                    <span className="f-ic"><IcoFile size={18} /></span>
-                    {f.url
-                      ? (() => {
-                          const isPdf = f.name?.toLowerCase().endsWith(".pdf");
-                          return <a className="grow" href={f.url} target="_blank" rel="noreferrer" {...(!isPdf ? { download: f.name } : {})} style={{ textDecoration:"none", cursor:"pointer" }}>
+                {meeting.attachments.map((f, i) => {
+                  if (f.is_link) return (
+                    <div className="file-row" key={i}>
+                      <span className="f-ic"><IcoLink size={18} /></span>
+                      <a className="grow" href={f.url} target="_blank" rel="noreferrer" style={{ textDecoration:"none", cursor:"pointer" }}>
+                        <div className="f-name" style={{ textDecoration:"underline", textUnderlineOffset:3 }}>{f.name}</div>
+                        <div className="f-size" style={{ wordBreak:"break-all" }}>{f.url}</div>
+                      </a>
+                      <a className="btn btn-ghost btn-sm" href={f.url} target="_blank" rel="noreferrer">
+                        <IcoLink size={16} /> เปิดลิงก์
+                      </a>
+                    </div>
+                  );
+                  const isPdf = f.name?.toLowerCase().endsWith(".pdf");
+                  return (
+                    <div className="file-row" key={i}>
+                      <span className="f-ic"><IcoFile size={18} /></span>
+                      {f.url
+                        ? <a className="grow" href={f.url} target="_blank" rel="noreferrer" {...(!isPdf ? { download: f.name } : {})} style={{ textDecoration:"none", cursor:"pointer" }}>
                             <div className="f-name" style={{ textDecoration:"underline", textUnderlineOffset:3 }}>{f.name}</div>
                             <div className="f-size">{f.size}</div>
-                          </a>;
-                        })()
-                      : <div className="grow"><div className="f-name">{f.name}</div><div className="f-size">{f.size}</div></div>
-                    }
-                    {f.url
-                      ? (() => {
-                          const isPdf = f.name?.toLowerCase().endsWith(".pdf");
-                          return isPdf
-                            ? <a className="btn btn-ghost btn-sm" href={f.url} target="_blank" rel="noreferrer">
-                                <IcoFile size={16} /> เปิดดู
-                              </a>
-                            : <a className="btn btn-ghost btn-sm" href={f.url} target="_blank" rel="noreferrer" download={f.name}>
-                                <IcoDownload size={16} /> ดาวน์โหลด
-                              </a>;
-                        })()
-                      : <span className="btn btn-ghost btn-sm" style={{ opacity:.4, cursor:"default" }}>
-                          <IcoDownload size={16} /> ดาวน์โหลด
-                        </span>
-                    }
-                  </div>
-                ))}
+                          </a>
+                        : <div className="grow"><div className="f-name">{f.name}</div><div className="f-size">{f.size}</div></div>
+                      }
+                      {f.url
+                        ? isPdf
+                          ? <a className="btn btn-ghost btn-sm" href={f.url} target="_blank" rel="noreferrer">
+                              <IcoFile size={16} /> เปิดดู
+                            </a>
+                          : <a className="btn btn-ghost btn-sm" href={f.url} target="_blank" rel="noreferrer" download={f.name}>
+                              <IcoDownload size={16} /> ดาวน์โหลด
+                            </a>
+                        : <span className="btn btn-ghost btn-sm" style={{ opacity:.4, cursor:"default" }}>
+                            <IcoDownload size={16} /> ดาวน์โหลด
+                          </span>
+                      }
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

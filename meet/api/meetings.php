@@ -30,7 +30,7 @@ function handleGet(PDO $db): never
     )->fetchAll();
 
     $atts = $db->query(
-        'SELECT meeting_id, filename, filesize, stored_name FROM attachments ORDER BY id ASC'
+        'SELECT meeting_id, filename, filesize, stored_name, link_url FROM attachments ORDER BY id ASC'
     )->fetchAll();
 
     $attMap = [];
@@ -158,16 +158,19 @@ function ensureAttachmentStoredName(PDO $db): void
 {
     try {
         $db->exec("ALTER TABLE attachments ADD COLUMN IF NOT EXISTS stored_name VARCHAR(80) DEFAULT NULL");
+        $db->exec("ALTER TABLE attachments ADD COLUMN IF NOT EXISTS link_url VARCHAR(2048) DEFAULT NULL");
     } catch (\Throwable) {}
 }
 
 function attRow(array $a): array
 {
+    $isLink = !empty($a['link_url']);
     return [
         'name'        => $a['filename'],
         'size'        => $a['filesize'],
         'stored_name' => $a['stored_name'] ?? null,
-        'url'         => $a['stored_name'] ? 'uploads/' . $a['stored_name'] : null,
+        'url'         => $isLink ? $a['link_url'] : ($a['stored_name'] ? 'uploads/' . $a['stored_name'] : null),
+        'is_link'     => $isLink,
     ];
 }
 
@@ -175,14 +178,15 @@ function insertAttachments(PDO $db, string $meetingId, array $atts): void
 {
     if (empty($atts)) return;
     $stmt = $db->prepare(
-        'INSERT INTO attachments (meeting_id, filename, filesize, stored_name) VALUES (?,?,?,?)'
+        'INSERT INTO attachments (meeting_id, filename, filesize, stored_name, link_url) VALUES (?,?,?,?,?)'
     );
     foreach ($atts as $a) {
         $stmt->execute([
             $meetingId,
             trim($a['name']         ?? ''),
             trim($a['size']         ?? ''),
-            trim($a['stored_name']  ?? '') ?: null,
+            empty($a['is_link']) ? (trim($a['stored_name'] ?? '') ?: null) : null,
+            !empty($a['is_link'])   ? trim($a['url'] ?? '') : null,
         ]);
     }
 }
@@ -195,7 +199,7 @@ function fetchMeeting(PDO $db, string $id): array
     if (!$m) jsonError('Meeting not found', 404);
 
     $aStmt = $db->prepare(
-        'SELECT filename, filesize, stored_name FROM attachments WHERE meeting_id=? ORDER BY id ASC'
+        'SELECT filename, filesize, stored_name, link_url FROM attachments WHERE meeting_id=? ORDER BY id ASC'
     );
     $aStmt->execute([$id]);
     $atts = array_map('attRow', $aStmt->fetchAll());

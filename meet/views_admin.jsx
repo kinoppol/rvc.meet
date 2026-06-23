@@ -270,6 +270,9 @@ function MeetingForm({ initial, onSave, onCancel }) {
   const [uploading, setUploading] = useS(false);
   const [uploadErr, setUploadErr] = useS("");
   const fileInputRef = useR(null);
+  const [linkInput,  setLinkInput]  = useS("");
+  const [linkLabel,  setLinkLabel]  = useS("");
+  const [linkErr,    setLinkErr]    = useS("");
 
   const pickFile = () => { setUploadErr(""); fileInputRef.current?.click(); };
 
@@ -300,6 +303,16 @@ function MeetingForm({ initial, onSave, onCancel }) {
   };
 
   const rmFile = (i) => set("attachments", f.attachments.filter((_, idx) => idx !== i));
+
+  const addLink = () => {
+    setLinkErr("");
+    const url = linkInput.trim();
+    if (!url) { setLinkErr("กรุณาระบุ URL"); return; }
+    if (!/^https?:\/\/.+/.test(url)) { setLinkErr("URL ต้องขึ้นต้นด้วย http:// หรือ https://"); return; }
+    const name = linkLabel.trim() || url;
+    set("attachments", [...f.attachments, { name, size: "", stored_name: null, url, is_link: true }]);
+    setLinkInput(""); setLinkLabel("");
+  };
 
   return (
     <div className="page" style={{ maxWidth:860 }}>
@@ -428,15 +441,16 @@ function MeetingForm({ initial, onSave, onCancel }) {
           </div>
 
           <div className="field col-2">
-            <label>ไฟล์วาระการประชุม <span className="hint" style={{ fontWeight:400 }}>(ไม่บังคับ)</span></label>
+            <label>เอกสารและลิงก์วาระการประชุม <span className="hint" style={{ fontWeight:400 }}>(ไม่บังคับ)</span></label>
             {f.attachments.length > 0 && (
               <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:10 }}>
                 {f.attachments.map((file, i) => (
                   <div className="file-row" key={i}>
-                    <span className="f-ic"><IcoFile size={18} /></span>
+                    <span className="f-ic">{file.is_link ? <IcoLink size={18} /> : <IcoFile size={18} />}</span>
                     <div className="grow">
                       <div className="f-name">{file.name}</div>
-                      <div className="f-size">{file.size}</div>
+                      {file.size && <div className="f-size">{file.size}</div>}
+                      {file.is_link && <div className="f-size" style={{ wordBreak:"break-all" }}>{file.url}</div>}
                     </div>
                     <button className="icon-btn" title="ลบ" onClick={() => rmFile(i)}><IcoTrash size={18} /></button>
                   </div>
@@ -444,14 +458,29 @@ function MeetingForm({ initial, onSave, onCancel }) {
               </div>
             )}
             <input ref={fileInputRef} type="file" accept=".pdf,.docx" style={{ display:"none" }} onChange={onFileChange} />
-            <button type="button" className="filedrop" onClick={pickFile} disabled={uploading} style={{ cursor:"pointer", width:"100%" }}>
+            <button type="button" className="filedrop" onClick={pickFile} disabled={uploading} style={{ cursor:"pointer", width:"100%", marginBottom:8 }}>
               <IcoFile size={22} />
               <span style={{ marginLeft:8 }}>
                 {uploading ? "กำลังอัพโหลด…" : "คลิกเพื่อแนบไฟล์วาระการประชุม (PDF, DOCX)"}
               </span>
             </button>
-            {uploadErr && <span className="hint" style={{ color:"var(--red)", marginTop:6 }}>{uploadErr}</span>}
-            <span className="hint" style={{ marginTop:4 }}>ขนาดไฟล์สูงสุด 10 MB ต่อไฟล์</span>
+            {uploadErr && <span className="hint" style={{ color:"var(--red)", marginTop:2, marginBottom:6, display:"block" }}>{uploadErr}</span>}
+            <span className="hint" style={{ marginBottom:10, display:"block" }}>ขนาดไฟล์สูงสุด 10 MB ต่อไฟล์</span>
+            <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+              <div style={{ display:"flex", gap:8 }}>
+                <input className="input" style={{ flex:1 }} placeholder="ชื่อลิงก์ (ไม่บังคับ) เช่น สไลด์นำเสนอ"
+                  value={linkLabel} onChange={e => setLinkLabel(e.target.value)} />
+              </div>
+              <div style={{ display:"flex", gap:8 }}>
+                <input className="input" style={{ flex:1 }} placeholder="URL เช่น https://drive.google.com/..."
+                  value={linkInput} onChange={e => setLinkInput(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && addLink()} />
+                <button type="button" className="btn btn-soft" onClick={addLink}>
+                  <IcoLink size={16} /> เพิ่มลิงก์
+                </button>
+              </div>
+              {linkErr && <span className="hint" style={{ color:"var(--red)" }}>{linkErr}</span>}
+            </div>
           </div>
         </div>
 

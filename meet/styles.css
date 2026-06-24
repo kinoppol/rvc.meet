@@ -239,6 +239,8 @@ input, select, textarea { font-family: inherit; }
 .btn-soft:hover { background: var(--line); }
 .btn-danger { background: #fff; color: var(--red); border-color: var(--red-50); }
 .btn-danger:hover { background: var(--red-50); }
+.btn-success { background: var(--green); color: #fff; box-shadow: var(--shadow-sm); }
+.btn-success:hover { filter: brightness(1.1); box-shadow: var(--shadow); }
 .btn-lg { padding: 13px 26px; font-size: 15.5px; }
 .btn-sm { padding: 7px 14px; font-size: 13.5px; }
 .btn-block { width: 100%; }

@@ -158,13 +158,13 @@ function AddAttendeeModal({ meeting, defaultAbsent = false, defaultLocation = ""
           <div className="field" style={{ marginTop:16 }}>
             <label>สถานะการเข้าร่วม</label>
             <div className="row" style={{ gap:10, marginTop:8 }}>
-              <button type="button" className={`btn ${mode==="attend"?"btn-primary":"btn-soft"}`} style={{ flex:1 }}
+              <button type="button" className={`btn btn-sm ${mode==="attend"?"btn-success":"btn-soft"}`} style={{ flex:1 }}
                 onClick={() => { setMode("attend"); setLocation(""); setError(""); }}>
-                <IcoUserCheck size={16} stroke="currentColor" /> เข้าประชุม
+                <IcoUserCheck size={15} stroke={mode==="attend"?"#fff":"currentColor"} /> เข้าประชุม
               </button>
-              <button type="button" className={`btn ${mode==="absent"?"btn-danger":"btn-soft"}`} style={{ flex:1 }}
+              <button type="button" className={`btn btn-sm ${mode==="absent"?"btn-danger":"btn-soft"}`} style={{ flex:1 }}
                 onClick={() => { setMode("absent"); setLocation(""); setError(""); }}>
-                <IcoX size={16} stroke="currentColor" /> ขาดประชุม
+                <IcoX size={15} stroke="currentColor" /> ขาดประชุม
               </button>
             </div>
           </div>

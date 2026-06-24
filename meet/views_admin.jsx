@@ -502,6 +502,7 @@ function Calendar({ meetings, onOpen }) {
   const [view,      setView]      = useS("month");
   const [cursor,    setCursor]    = useS(() => { const d = new Date(); d.setDate(1); d.setHours(0,0,0,0); return d; });
   const [weekStart, setWeekStart] = useS(() => startOfWeek(new Date()));
+  const [popup,     setPopup]     = useS(null); /* { evs, x, y, label } */
 
   const byDay = useM(() => {
     const map = {};
@@ -536,15 +537,35 @@ function Calendar({ meetings, onOpen }) {
         </div>
       </div>
 
+      {popup && <>
+        <div className="cal-popup-bg" onClick={() => setPopup(null)} />
+        <div className="cal-popup" style={{ top: popup.y, left: popup.x }}>
+          <div className="cal-popup-title">{popup.label}</div>
+          {popup.evs.map(m => {
+            const st   = meetingStatus(m, now);
+            const dept = deptById(m.dept);
+            const bg   = st==="live" ? "var(--green)" : (st==="upcoming" ? dept.color : "var(--faint)");
+            return (
+              <div key={m.id} className="cal-popup-ev" onClick={() => { setPopup(null); onOpen(m); }}>
+                <span className="cal-popup-dot" style={{ background: bg }} />
+                <span className="cal-popup-ev-name">{m.title}</span>
+                <span className="cal-popup-ev-time">{fmtTime(new Date(m.start))}</span>
+              </div>
+            );
+          })}
+        </div>
+      </>}
       <div className="cal-grid">
         {["อา","จ","อ","พ","พฤ","ศ","ส"].map(d => <div className="cal-dow" key={d}>{d}</div>)}
         {cells.map((d, i) => {
           const out = d.getMonth() !== cursor.getMonth();
           const evs = byDay[dayKey(d)] || [];
+          const shown = evs.slice(0, 3);
+          const rest  = evs.slice(3);
           return (
             <div className={`cal-cell ${out?"out":""} ${isToday(d)?"today":""}`} key={i}>
               <span className="cdate">{d.getDate()}</span>
-              {evs.slice(0, 3).map(m => {
+              {shown.map(m => {
                 const st   = meetingStatus(m, now);
                 const dept = deptById(m.dept);
                 return (
@@ -553,7 +574,14 @@ function Calendar({ meetings, onOpen }) {
                     title={m.title}>{fmtTime(new Date(m.start))} {m.title}</div>
                 );
               })}
-              {evs.length > 3 && <span className="cal-more">+{evs.length-3} รายการ</span>}
+              {rest.length > 0 && (
+                <span className="cal-more" onClick={e => {
+                  const rect = e.currentTarget.closest(".cal-cell").getBoundingClientRect();
+                  const x = Math.min(rect.left, window.innerWidth - 340);
+                  const y = rect.bottom + 4 > window.innerHeight - 200 ? rect.top - 8 : rect.bottom + 4;
+                  setPopup({ evs, label: `${d.getDate()} — ${evs.length} รายการ`, x, y });
+                }}>+{rest.length} รายการ</span>
+              )}
             </div>
           );
         })}

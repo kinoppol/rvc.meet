@@ -913,19 +913,8 @@ function DrinkOrderSection({ meeting, auth, drinks, onGoLogin, admin }) {
 
   const avail = drinks.filter(d => d.is_available);
 
-  // Admin sees orders panel (handled in views_admin.jsx via DrinkOrdersPanel)
-  // This section renders for non-admin users (and also shows a summary for admin)
   const sectionStyle = { marginTop:28 };
   const headerStyle  = { fontFamily:"var(--font-display)", fontWeight:700, fontSize:16, marginBottom:12, display:"flex", alignItems:"center", gap:8 };
-
-  if (admin) {
-    // Admin: show collapsible orders list
-    return (
-      <div style={sectionStyle}>
-        <DrinkOrdersPanel meeting={meeting} />
-      </div>
-    );
-  }
 
   /* ── เงื่อนไขการสั่ง ── */
   const condItems = [];
@@ -1041,6 +1030,8 @@ function DrinkOrderSection({ meeting, auth, drinks, onGoLogin, admin }) {
           </div>
         </div>
       )}
+
+      {admin && <DrinkOrdersPanel meeting={meeting} />}
     </div>
   );
 }

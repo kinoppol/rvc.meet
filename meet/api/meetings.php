@@ -10,6 +10,7 @@ $id     = trim($_GET['id'] ?? '');
 try {
     $db = getDB();
     ensureAttachmentStoredName($db);
+    ensureDrinksColumn($db);
     match ($method) {
         'GET'    => handleGet($db),
         'POST'   => handlePost($db),
@@ -61,8 +62,8 @@ function handlePost(PDO $db): never
     $db->prepare(
         'INSERT INTO meetings
             (id, title, description, organizer, dept, invitees,
-             start_time, end_time, platform, link, location)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?)'
+             start_time, end_time, platform, link, location, drinks_enabled)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)'
     )->execute([
         $id,
         trim($d['title']       ?? ''),
@@ -75,6 +76,7 @@ function handlePost(PDO $db): never
         $d['platform']         ?? 'meet',
         trim($d['link']        ?? ''),
         trim($d['location']    ?? ''),
+        empty($d['drinks_enabled']) ? 0 : 1,
     ]);
 
     insertAttachments($db, $id, $d['attachments'] ?? []);
@@ -91,7 +93,7 @@ function handlePut(PDO $db, string $id): never
     $stmt = $db->prepare(
         'UPDATE meetings SET
             title=?, description=?, organizer=?, dept=?, invitees=?,
-            start_time=?, end_time=?, platform=?, link=?, location=?
+            start_time=?, end_time=?, platform=?, link=?, location=?, drinks_enabled=?
          WHERE id=?'
     );
     $stmt->execute([
@@ -105,6 +107,7 @@ function handlePut(PDO $db, string $id): never
         $d['platform']         ?? 'meet',
         trim($d['link']        ?? ''),
         trim($d['location']    ?? ''),
+        empty($d['drinks_enabled']) ? 0 : 1,
         $id,
     ]);
 
@@ -159,6 +162,33 @@ function ensureAttachmentStoredName(PDO $db): void
     try {
         $db->exec("ALTER TABLE attachments ADD COLUMN IF NOT EXISTS stored_name VARCHAR(80) DEFAULT NULL");
         $db->exec("ALTER TABLE attachments ADD COLUMN IF NOT EXISTS link_url VARCHAR(2048) DEFAULT NULL");
+    } catch (\Throwable) {}
+}
+
+function ensureDrinksColumn(PDO $db): void
+{
+    try {
+        $db->exec("ALTER TABLE meetings ADD COLUMN IF NOT EXISTS drinks_enabled TINYINT(1) NOT NULL DEFAULT 0");
+        $db->exec("CREATE TABLE IF NOT EXISTS `drinks` (
+            `id`           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `name`         VARCHAR(200) NOT NULL,
+            `sort_order`   INT NOT NULL DEFAULT 0,
+            `is_available` TINYINT(1) NOT NULL DEFAULT 1,
+            `created_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $db->exec("CREATE TABLE IF NOT EXISTS `drink_orders` (
+            `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `meeting_id` VARCHAR(20)  NOT NULL,
+            `user_id`    INT UNSIGNED NULL,
+            `name`       VARCHAR(200) NOT NULL,
+            `items`      JSON NOT NULL,
+            `notes`      TEXT,
+            `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_meeting` (`meeting_id`),
+            CONSTRAINT `fk_dorder_meeting` FOREIGN KEY (`meeting_id`) REFERENCES `meetings`(`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     } catch (\Throwable) {}
 }
 

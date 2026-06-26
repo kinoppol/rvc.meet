@@ -37,9 +37,10 @@ CREATE TABLE IF NOT EXISTS `meetings` (
     `start_time`  DATETIME      NOT NULL COMMENT 'UTC',
     `end_time`    DATETIME      NOT NULL COMMENT 'UTC',
     `platform`    VARCHAR(20)   NOT NULL DEFAULT 'meet',
-    `link`        VARCHAR(1000) NOT NULL,
-    `location`    VARCHAR(500)           DEFAULT NULL,
-    `created_at`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `link`           VARCHAR(1000) NOT NULL,
+    `location`       VARCHAR(500)           DEFAULT NULL,
+    `drinks_enabled` TINYINT(1)    NOT NULL DEFAULT 0,
+    `created_at`     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP
                                           ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
@@ -80,3 +81,29 @@ CREATE TABLE IF NOT EXISTS `attendance` (
         FOREIGN KEY (`meeting_id`) REFERENCES `meetings` (`id`)
         ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ── Drinks menu ───────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS `drinks` (
+    `id`           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `name`         VARCHAR(200) NOT NULL,
+    `sort_order`   INT          NOT NULL DEFAULT 0,
+    `is_available` TINYINT(1)   NOT NULL DEFAULT 1,
+    `created_at`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ── Drink orders ──────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS `drink_orders` (
+    `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `meeting_id` VARCHAR(20)  NOT NULL,
+    `user_id`    INT UNSIGNED NULL,
+    `name`       VARCHAR(200) NOT NULL,
+    `items`      JSON         NOT NULL  COMMENT '[{"drink_id":1,"name":"ชา","qty":2}]',
+    `notes`      TEXT,
+    `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_meeting` (`meeting_id`),
+    CONSTRAINT `fk_dorder_meeting`
+        FOREIGN KEY (`meeting_id`) REFERENCES `meetings` (`id`)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

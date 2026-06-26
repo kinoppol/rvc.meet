@@ -43,6 +43,8 @@ const IcoWalk     = (p) => <Ico {...p}><circle cx="13" cy="3.5" r="1.7"/><path d
 const IcoMaximize = (p) => <Ico {...p}><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></Ico>;
 const IcoMinimize = (p) => <Ico {...p}><path d="M8 3v5H3M21 8h-5V3M3 16h5v5M16 21v-5h5"/></Ico>;
 const IcoSun      = (p) => <Ico {...p}><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></Ico>;
+const IcoCoffee   = (p) => <Ico {...p}><path d="M6 2v2M10 2v2M14 2v2"/><path d="M4 6h12l-1.5 10a2.5 2.5 0 0 1-2.5 2H8a2.5 2.5 0 0 1-2.5-2L4 6z"/><path d="M16 9h2a2 2 0 0 1 0 4h-2"/></Ico>;
+const IcoPencil   = (p) => <Ico {...p}><path d="M4 20h4l10.5-10.5a2 2 0 0 0 0-2.8l-1.2-1.2a2 2 0 0 0-2.8 0L4 16v4z"/><path d="M14.5 6.5l3 3"/></Ico>;
 const IcoMoon     = (p) => <Ico {...p}><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></Ico>;
 const IcoMonitor  = (p) => <Ico {...p}><rect x="2" y="3" width="20" height="14" rx="2.5"/><path d="M8 21h8M12 17v4"/></Ico>;
 
@@ -67,6 +69,6 @@ Object.assign(window, {
   IcoDownload, IcoPlus, IcoSearch, IcoEdit, IcoTrash, IcoChevL, IcoChevR, IcoChevDown,
   IcoArrowR, IcoCheck, IcoCheckCircle, IcoX, IcoLock, IcoLogout, IcoBuilding, IcoList,
   IcoGrid, IcoBell, IcoSparkle, IcoShield, IcoCopy, IcoEye, IcoClipboard, IcoUserCheck, IcoWalk,
-  IcoMaximize, IcoMinimize, IcoSun, IcoMoon, IcoMonitor,
+  IcoMaximize, IcoMinimize, IcoSun, IcoMoon, IcoMonitor, IcoCoffee, IcoPencil,
   PfMeet, PfZoom, PfWebex, PfTeams, PfOther,
 });

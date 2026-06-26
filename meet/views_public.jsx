@@ -766,8 +766,276 @@ function VirtualRoom({ meeting, auth, onClose }) {
   );
 }
 
+/* ============ Drink orders panel (admin collapsible) ============ */
+function DrinkOrdersPanel({ meeting }) {
+  const [orders,  setOrders]  = useStateP([]);
+  const [loading, setLoading] = useStateP(true);
+  const [open,    setOpen]    = useStateP(false);
+
+  useEffectP(() => {
+    if (!open) return;
+    setLoading(true);
+    fetch(`api/drink_orders.php?meeting_id=${encodeURIComponent(meeting.id)}`, { credentials:"same-origin" })
+      .then(r => r.json())
+      .then(d => { if (d.success) setOrders(d.data); })
+      .finally(() => setLoading(false));
+  }, [open, meeting.id]);
+
+  const fmtItems = (items) => items.map(it => `${it.name} x${it.qty}`).join(", ");
+  const fmtTs    = (ts) => {
+    const d = new Date(ts.endsWith("Z") ? ts : ts + "Z");
+    return d.toLocaleString("th-TH", { timeZone:"Asia/Bangkok", hour:"2-digit", minute:"2-digit", day:"numeric", month:"short" });
+  };
+
+  return (
+    <div>
+      <button className="btn btn-soft btn-sm" onClick={() => setOpen(o => !o)} style={{ marginBottom: open ? 12 : 0 }}>
+        <IcoCoffee size={16} /> รายการสั่งเครื่องดื่ม
+        <IcoChevDown size={14} style={{ transition:"transform .2s", transform: open ? "rotate(180deg)" : "none" }} />
+      </button>
+      {open && (
+        <div className="card" style={{ padding:0, overflow:"hidden" }}>
+          {loading ? (
+            <div style={{ padding:24, textAlign:"center", color:"var(--muted)" }}>กำลังโหลด…</div>
+          ) : orders.length === 0 ? (
+            <div style={{ padding:24, textAlign:"center", color:"var(--muted)" }}>ยังไม่มีการสั่งเครื่องดื่ม</div>
+          ) : (
+            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:14 }}>
+              <thead>
+                <tr style={{ borderBottom:"1px solid var(--border)", background:"var(--bg-2)" }}>
+                  <th style={{ padding:"10px 16px", textAlign:"left", fontWeight:600 }}>ชื่อ</th>
+                  <th style={{ padding:"10px 16px", textAlign:"left", fontWeight:600 }}>รายการ</th>
+                  <th style={{ padding:"10px 16px", textAlign:"left", fontWeight:600 }}>หมายเหตุ</th>
+                  <th style={{ padding:"10px 16px", textAlign:"left", fontWeight:600 }}>เวลา</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((o, i) => (
+                  <tr key={o.id} style={{ borderBottom: i < orders.length - 1 ? "1px solid var(--border)" : "none" }}>
+                    <td style={{ padding:"10px 16px", fontWeight:500 }}>{o.name}</td>
+                    <td style={{ padding:"10px 16px" }}>{fmtItems(o.items)}</td>
+                    <td style={{ padding:"10px 16px", color:"var(--muted)" }}>{o.notes || "—"}</td>
+                    <td style={{ padding:"10px 16px", color:"var(--muted)", whiteSpace:"nowrap" }}>{fmtTs(o.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============ Drink order section ============ */
+function DrinkOrderSection({ meeting, auth, drinks, onGoLogin, admin }) {
+  const now      = useNow(10000);
+  const startTs  = new Date(meeting.start).getTime();
+  const windowStart = startTs - 24 * 60 * 60 * 1000;
+  const inWindow = now.getTime() >= windowStart && now.getTime() < startTs;
+  const tooEarly = now.getTime() < windowStart;
+  const tooLate  = now.getTime() >= startTs;
+
+  const [myOrder,  setMyOrder]  = useStateP(null);   // existing order or null
+  const [editing,  setEditing]  = useStateP(!admin);  // show form if public
+  const [qtys,     setQtys]     = useStateP({});       // { drink_id: qty }
+  const [name,     setName]     = useStateP(auth?.name ?? "");
+  const [notes,    setNotes]    = useStateP("");
+  const [busy,     setBusy]     = useStateP(false);
+  const [err,      setErr]      = useStateP("");
+  const [toast,    setToast]    = useStateP("");
+  const [loaded,   setLoaded]   = useStateP(false);
+
+  const showToast = (m) => { setToast(m); setTimeout(() => setToast(""), 3000); };
+
+  // Load existing order for this user
+  useEffectP(() => {
+    if (!auth || !inWindow) return;
+    fetch(`api/drink_orders.php?meeting_id=${encodeURIComponent(meeting.id)}&mine=1`, { credentials:"same-origin" })
+      .then(r => r.json())
+      .then(d => {
+        if (d.success && d.data.length > 0) {
+          const o = d.data[0];
+          setMyOrder(o);
+          setName(o.name);
+          setNotes(o.notes || "");
+          const q = {};
+          o.items.forEach(it => { q[it.drink_id] = it.qty; });
+          setQtys(q);
+          setEditing(false);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+  }, [auth, meeting.id, inWindow]);
+
+  const setQty = (drinkId, qty) => setQtys(prev => ({ ...prev, [drinkId]: qty }));
+
+  const submit = async () => {
+    if (!auth) { onGoLogin && onGoLogin(); return; }
+    const nm = name.trim();
+    if (!nm) { setErr("กรุณาระบุชื่อ"); return; }
+    const avail = drinks.filter(d => d.is_available);
+    const items = avail.filter(d => (qtys[d.id] || 0) > 0).map(d => ({
+      drink_id: d.id, name: d.name, qty: parseInt(qtys[d.id]) || 1,
+    }));
+    if (items.length === 0) { setErr("กรุณาเลือกเครื่องดื่มอย่างน้อย 1 รายการ"); return; }
+    setErr(""); setBusy(true);
+    try {
+      const res  = await fetch("api/drink_orders.php", {
+        method:"POST", headers:{"Content-Type":"application/json"}, credentials:"same-origin",
+        body: JSON.stringify({ meeting_id: meeting.id, name: nm, items, notes: notes.trim() }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMyOrder(data.data);
+        setEditing(false);
+        showToast("บันทึกออเดอร์แล้ว");
+      } else {
+        setErr(data.error ?? "เกิดข้อผิดพลาด");
+      }
+    } catch { setErr("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"); }
+    finally { setBusy(false); }
+  };
+
+  const cancelOrder = async () => {
+    if (!myOrder) return;
+    setBusy(true);
+    try {
+      const res  = await fetch(`api/drink_orders.php?id=${myOrder.id}`, { method:"DELETE", credentials:"same-origin" });
+      const data = await res.json();
+      if (data.success) {
+        setMyOrder(null); setEditing(true); setQtys({}); setNotes(""); setName(auth?.name ?? "");
+        showToast("ยกเลิกออเดอร์แล้ว");
+      }
+    } catch {}
+    finally { setBusy(false); }
+  };
+
+  const avail = drinks.filter(d => d.is_available);
+  const fmtWindowOpen = new Date(windowStart).toLocaleString("th-TH", {
+    timeZone:"Asia/Bangkok", weekday:"short", day:"numeric", month:"short", hour:"2-digit", minute:"2-digit"
+  });
+
+  // Admin sees orders panel (handled in views_admin.jsx via DrinkOrdersPanel)
+  // This section renders for non-admin users (and also shows a summary for admin)
+  const sectionStyle = { marginTop:28 };
+  const headerStyle  = { fontFamily:"var(--font-display)", fontWeight:700, fontSize:16, marginBottom:12, display:"flex", alignItems:"center", gap:8 };
+
+  if (admin) {
+    // Admin: show collapsible orders list
+    return (
+      <div style={sectionStyle}>
+        <DrinkOrdersPanel meeting={meeting} />
+      </div>
+    );
+  }
+
+  return (
+    <div style={sectionStyle}>
+      <div style={headerStyle}>
+        <IcoCoffee size={20} stroke="var(--blue)" /> สั่งเครื่องดื่ม
+      </div>
+
+      {toast && (
+        <div className="chip" style={{ background:"var(--green-50)", color:"var(--green)", marginBottom:12 }}>
+          <IcoCheck size={14} /> {toast}
+        </div>
+      )}
+
+      {tooEarly && (
+        <div className="card" style={{ padding:"16px 20px", background:"var(--bg-2)" }}>
+          <span className="muted">เปิดรับออเดอร์ในวันที่ {fmtWindowOpen} น.</span>
+        </div>
+      )}
+
+      {tooLate && (
+        <div className="card" style={{ padding:"16px 20px", background:"var(--bg-2)" }}>
+          <span className="muted">หมดเวลาสั่งเครื่องดื่มแล้ว</span>
+        </div>
+      )}
+
+      {inWindow && !auth && (
+        <div className="card" style={{ padding:"16px 20px" }}>
+          <span className="muted">กรุณา </span>
+          <button className="btn btn-soft btn-sm" onClick={onGoLogin}>เข้าสู่ระบบ</button>
+          <span className="muted"> เพื่อสั่งเครื่องดื่ม</span>
+        </div>
+      )}
+
+      {inWindow && auth && avail.length === 0 && (
+        <div className="card" style={{ padding:"16px 20px", background:"var(--bg-2)" }}>
+          <span className="muted">ยังไม่มีเมนูเครื่องดื่มในขณะนี้</span>
+        </div>
+      )}
+
+      {inWindow && auth && avail.length > 0 && !editing && myOrder && (
+        <div className="card" style={{ padding:20 }}>
+          <div style={{ fontWeight:600, marginBottom:8 }}>ออเดอร์ของคุณ</div>
+          <div className="muted" style={{ fontSize:14, marginBottom:4 }}>
+            {myOrder.items.map(it => `${it.name} x${it.qty}`).join(", ")}
+          </div>
+          {myOrder.notes && <div className="muted" style={{ fontSize:13, marginBottom:8 }}>หมายเหตุ: {myOrder.notes}</div>}
+          <div className="row" style={{ gap:10, marginTop:12 }}>
+            <button className="btn btn-soft btn-sm" onClick={() => setEditing(true)} disabled={busy}>
+              <IcoPencil size={15} /> แก้ไข
+            </button>
+            <button className="btn btn-sm" style={{ color:"var(--red)", background:"var(--red-50)", border:"none" }}
+              onClick={cancelOrder} disabled={busy}>
+              <IcoTrash size={15} /> ยกเลิกออเดอร์
+            </button>
+          </div>
+        </div>
+      )}
+
+      {inWindow && auth && avail.length > 0 && editing && (
+        <div className="card" style={{ padding:22 }}>
+          <div className="field" style={{ marginBottom:14 }}>
+            <label style={{ fontWeight:500, fontSize:14, marginBottom:6, display:"block" }}>ชื่อ</label>
+            <input className="input" value={name} onChange={e => setName(e.target.value)}
+              placeholder="ชื่อของคุณ" />
+          </div>
+
+          <div style={{ marginBottom:14 }}>
+            <div style={{ fontWeight:500, fontSize:14, marginBottom:10 }}>เลือกเครื่องดื่ม</div>
+            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+              {avail.map(d => (
+                <div key={d.id} className="row" style={{ gap:12, alignItems:"center" }}>
+                  <span style={{ flex:1, fontSize:14 }}>{d.name}</span>
+                  <input type="number" min="0" max="10"
+                    className="input" style={{ width:72, textAlign:"center" }}
+                    value={qtys[d.id] || ""}
+                    placeholder="0"
+                    onChange={e => setQty(d.id, e.target.value)} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="field" style={{ marginBottom:16 }}>
+            <label style={{ fontWeight:500, fontSize:14, marginBottom:6, display:"block" }}>หมายเหตุ <span className="muted" style={{ fontWeight:400 }}>(ไม่บังคับ)</span></label>
+            <textarea className="textarea" rows={2} value={notes} onChange={e => setNotes(e.target.value)}
+              placeholder="เช่น ไม่ใส่น้ำตาล, ร้อนพิเศษ" />
+          </div>
+
+          {err && <div className="hint" style={{ color:"var(--red)", marginBottom:10 }}>{err}</div>}
+
+          <div className="row" style={{ gap:10 }}>
+            {myOrder && (
+              <button className="btn btn-soft btn-sm" onClick={() => setEditing(false)} disabled={busy}>ยกเลิก</button>
+            )}
+            <button className="btn btn-primary" onClick={submit} disabled={busy}>
+              <IcoCheck size={16} stroke="#fff" /> {busy ? "กำลังบันทึก…" : "ยืนยันออเดอร์"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ============ Meeting detail ============ */
-function MeetingDetail({ meeting, auth, onBack, admin, onEdit, onDelete, onGoLogin }) {
+function MeetingDetail({ meeting, auth, onBack, admin, onEdit, onDelete, onGoLogin, drinks }) {
   const now    = useNow(1000);
   if (!meeting) return null;
   const s      = new Date(meeting.start), e = new Date(meeting.end);
@@ -899,6 +1167,11 @@ function MeetingDetail({ meeting, auth, onBack, admin, onEdit, onDelete, onGoLog
                 : <AttendancePanel meeting={meeting} auth={auth} canManage={canManage} isLive={false} />
               }
             </div>
+          )}
+
+          {/* ── Drinks ordering panel ── */}
+          {meeting.drinks_enabled && (
+            <DrinkOrderSection meeting={meeting} auth={auth} drinks={drinks || []} onGoLogin={onGoLogin} admin={admin} />
           )}
         </div>
 

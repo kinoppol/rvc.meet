@@ -210,6 +210,7 @@ function ErrorScreen({ message }) {
 /* ── Main App ────────────────────────────────────────────── */
 function App() {
   const [meetings,  setMeetings]  = useSt([]);
+  const [drinks,    setDrinks]    = useSt([]);
   const [auth,      setAuth]      = useSt(null);
   const [expireAt,  setExpireAt]  = useSt(null);   // Unix timestamp (วินาที) สำหรับ remember-me
   const [view,      setView]      = useSt("agenda");
@@ -237,19 +238,27 @@ function App() {
     setTheme(next);
   };
 
-  /* Load auth + meetings on mount */
+  const loadDrinks = () =>
+    fetch("api/drinks.php", { credentials:"same-origin" })
+      .then(r => r.json())
+      .then(d => { if (d.success) setDrinks(d.data); })
+      .catch(() => {});
+
+  /* Load auth + meetings + drinks on mount */
   useEf(() => {
     Promise.all([
       fetch("api/auth.php",     { credentials:"same-origin" }).then(r => r.json()),
       fetch("api/meetings.php", { credentials:"same-origin" }).then(r => r.json()),
+      fetch("api/drinks.php",   { credentials:"same-origin" }).then(r => r.json()),
     ])
-      .then(([authRes, meetRes]) => {
+      .then(([authRes, meetRes, drinksRes]) => {
         if (authRes.success && authRes.data.user) {
           setAuth(authRes.data.user);
           if (authRes.data.expire_at) setExpireAt(authRes.data.expire_at);
         }
         if (meetRes.success) setMeetings(meetRes.data);
         else setApiError("โหลดข้อมูลไม่ได้: " + (meetRes.error ?? ""));
+        if (drinksRes.success) setDrinks(drinksRes.data);
       })
       .catch(() => setApiError(
         "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ — กรุณาตรวจสอบการติดตั้งและการตั้งค่าฐานข้อมูล"
@@ -338,13 +347,13 @@ function App() {
   useEf(() => {
     if (!auth) {
       // ต้อง login ก่อนเข้า admin views
-      if (["dashboard","calendar","form","users"].includes(view)) go("login");
+      if (["dashboard","calendar","form","users","drinks"].includes(view)) go("login");
     } else if (auth.permission === 'staff') {
       // staff เข้า management pages ไม่ได้
-      if (["dashboard","form","users"].includes(view)) go("agenda");
+      if (["dashboard","form","users","drinks"].includes(view)) go("agenda");
     } else if (!isAdmin(auth)) {
       // organizer เข้าหน้า users ไม่ได้
-      if (view === "users") go("dashboard");
+      if (["users","drinks"].includes(view)) go("dashboard");
     }
   }, [auth, view]);
 
@@ -365,11 +374,12 @@ function App() {
 
       {view === "agenda"    && <PublicAgenda meetings={meetings} auth={auth} onOpen={openDetail} onGoLogin={() => go("login")} />}
       {view === "login"     && <Login onLogin={doLogin} onBack={() => go("agenda")} />}
-      {view === "dashboard" && canManage(auth) && <Dashboard meetings={meetings} auth={auth} onOpen={openDetail} onNew={startNew} onEdit={startEdit} onDelete={askDelete} />}
+      {view === "dashboard" && canManage(auth) && <Dashboard meetings={meetings} auth={auth} onOpen={openDetail} onNew={startNew} onEdit={startEdit} onDelete={askDelete} onGoDrinks={() => go("drinks")} />}
       {view === "calendar"  && auth && <Calendar meetings={meetings} onOpen={openDetail} />}
       {view === "form"      && canManage(auth) && <MeetingForm initial={editing} onSave={saveMeeting} onCancel={() => go("dashboard")} />}
-      {view === "detail"    && <MeetingDetail meeting={liveSelected} auth={auth} onBack={() => go(canManage(auth) ? "dashboard" : "agenda")} admin={canManage(auth)} onEdit={startEdit} onDelete={askDelete} onGoLogin={() => go("login")} />}
+      {view === "detail"    && <MeetingDetail meeting={liveSelected} auth={auth} onBack={() => go(canManage(auth) ? "dashboard" : "agenda")} admin={canManage(auth)} onEdit={startEdit} onDelete={askDelete} onGoLogin={() => go("login")} drinks={drinks} />}
       {view === "users"     && isAdmin(auth) && <UserManagement currentUser={auth} />}
+      {view === "drinks"    && isAdmin(auth) && <DrinkManager drinks={drinks} onSave={loadDrinks} />}
 
       {confirm && (
         <ConfirmModal

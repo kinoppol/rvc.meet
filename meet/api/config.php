@@ -157,7 +157,8 @@ function formatMeeting(array $m, array $attachments): array
         'end'         => $end->format(DateTimeInterface::ATOM),
         'platform'    => $m['platform'],
         'link'        => $m['link'],
-        'location'    => $m['location'] ?? '',
-        'attachments' => $attachments,
+        'location'       => $m['location'] ?? '',
+        'drinks_enabled' => (bool)($m['drinks_enabled'] ?? false),
+        'attachments'    => $attachments,
     ];
 }

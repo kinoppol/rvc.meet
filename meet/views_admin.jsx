@@ -132,7 +132,7 @@ function Login({ onLogin, onBack }) {
 }
 
 /* ===================== DASHBOARD (manage) ===================== */
-function Dashboard({ meetings, auth, onOpen, onNew, onEdit, onDelete }) {
+function Dashboard({ meetings, auth, onOpen, onNew, onEdit, onDelete, onGoDrinks }) {
   const now = useNow(1000);
   const [q,      setQ]      = useS("");
   const [filter, setFilter] = useS("today");
@@ -173,9 +173,16 @@ function Dashboard({ meetings, auth, onOpen, onNew, onEdit, onDelete }) {
             รายการประชุมทั้งหมด {counts.all} รายการ · กำลังประชุมอยู่ {counts.live} · กำลังจะเริ่ม {counts.upcoming}
           </div>
         </div>
-        <button className="btn btn-primary btn-lg" onClick={onNew}>
-          <IcoPlus size={19} stroke="#fff" /> สร้างการประชุม
-        </button>
+        <div className="row" style={{ gap:10 }}>
+          {onGoDrinks && (
+            <button className="btn btn-soft" onClick={onGoDrinks}>
+              <IcoCoffee size={17} /> จัดการเมนูเครื่องดื่ม
+            </button>
+          )}
+          <button className="btn btn-primary btn-lg" onClick={onNew}>
+            <IcoPlus size={19} stroke="#fff" /> สร้างการประชุม
+          </button>
+        </div>
       </div>
 
       <div className="row between wrap" style={{ marginBottom:18, gap:14 }}>
@@ -218,7 +225,7 @@ function MeetingForm({ initial, onSave, onCancel }) {
     title:"", description:"", organizer:"", dept:"director", invitees:"",
     start: toInputLocal(roundToNext()),
     end:   toInputLocal(new Date(roundToNext().getTime() + 90 * 60000)),
-    platform:"meet", link:"", location:"", attachments:[],
+    platform:"meet", link:"", location:"", attachments:[], drinks_enabled: false,
   };
   /* แยก dept กับ ชื่อแผนก ออกจากกัน เมื่อโหลดจาก initial */
   const initDept = initial?.dept?.startsWith("section:") ? "section"
@@ -229,9 +236,10 @@ function MeetingForm({ initial, onSave, onCancel }) {
 
   const [f,    setF]    = useS({
     ...def,
-    dept:  initDept,
-    start: initial ? toInputLocal(new Date(initial.start)) : def.start,
-    end:   initial ? toInputLocal(new Date(initial.end))   : def.end,
+    dept:          initDept,
+    start:         initial ? toInputLocal(new Date(initial.start)) : def.start,
+    end:           initial ? toInputLocal(new Date(initial.end))   : def.end,
+    drinks_enabled: initial?.drinks_enabled ?? false,
   });
   const [sectName,  setSectName]  = useS(initSect);
   const [otherName, setOtherName] = useS(initOther);
@@ -484,6 +492,22 @@ function MeetingForm({ initial, onSave, onCancel }) {
           </div>
         </div>
 
+          <div className="field col-2" style={{ borderTop:"1px solid var(--border)", paddingTop:18, marginTop:4 }}>
+            <label style={{ fontWeight:600, marginBottom:8, display:"block" }}>ฟีเจอร์เพิ่มเติม</label>
+            <div className="row" style={{ gap:10, alignItems:"center" }}>
+              <button type="button"
+                className={`btn btn-sm ${f.drinks_enabled ? "btn-primary" : "btn-soft"}`}
+                style={{ minWidth:130 }}
+                onClick={() => set("drinks_enabled", !f.drinks_enabled)}>
+                {f.drinks_enabled ? <IcoCheck size={15} stroke="#fff" /> : <IcoCoffee size={15} />}
+                {f.drinks_enabled ? " เปิดรับออเดอร์เครื่องดื่ม" : " เปิดรับออเดอร์เครื่องดื่ม"}
+              </button>
+              <span className="hint" style={{ margin:0 }}>
+                {f.drinks_enabled ? "ผู้ใช้จะสั่งเครื่องดื่มล่วงหน้าได้ 24 ชั่วโมงก่อนประชุม" : "ปิดอยู่ — ผู้ใช้จะไม่เห็นแบบฟอร์มสั่งเครื่องดื่ม"}
+              </span>
+            </div>
+          </div>
+
         <div className="row" style={{ justifyContent:"flex-end", marginTop:26, gap:10 }}>
           <button className="btn btn-soft" onClick={onCancel}>ยกเลิก</button>
           <button className="btn btn-primary btn-lg" onClick={submit}>
@@ -495,6 +519,112 @@ function MeetingForm({ initial, onSave, onCancel }) {
   );
 }
 function roundToNext() { const d = new Date(); d.setMinutes(d.getMinutes() < 30 ? 30 : 60, 0, 0); return d; }
+
+/* ===================== DRINK MANAGER ===================== */
+function DrinkManager({ drinks, onSave }) {
+  const [newName, setNewName] = useS("");
+  const [busy,    setBusy]    = useS(false);
+  const [err,     setErr]     = useS("");
+  const [toast,   setToast]   = useS("");
+
+  const showToast = (m) => { setToast(m); setTimeout(() => setToast(""), 2500); };
+
+  const addDrink = async () => {
+    const name = newName.trim();
+    if (!name) { setErr("กรุณาระบุชื่อเมนู"); return; }
+    setErr(""); setBusy(true);
+    try {
+      const res  = await fetch("api/drinks.php", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        credentials:"same-origin", body: JSON.stringify({ name, sort_order: drinks.length }),
+      });
+      const data = await res.json();
+      if (data.success) { setNewName(""); onSave(); showToast("เพิ่มเมนูแล้ว"); }
+      else setErr(data.error ?? "เกิดข้อผิดพลาด");
+    } catch { setErr("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"); }
+    finally { setBusy(false); }
+  };
+
+  const toggleAvail = async (drink) => {
+    try {
+      const res  = await fetch(`api/drinks.php?id=${drink.id}`, {
+        method:"PUT", headers:{"Content-Type":"application/json"},
+        credentials:"same-origin",
+        body: JSON.stringify({ name: drink.name, is_available: !drink.is_available, sort_order: drink.sort_order }),
+      });
+      const data = await res.json();
+      if (data.success) onSave();
+    } catch {}
+  };
+
+  const deleteDrink = async (id) => {
+    if (!confirm("ลบเมนูนี้?")) return;
+    try {
+      const res  = await fetch(`api/drinks.php?id=${id}`, { method:"DELETE", credentials:"same-origin" });
+      const data = await res.json();
+      if (data.success) { onSave(); showToast("ลบเมนูแล้ว"); }
+    } catch {}
+  };
+
+  return (
+    <div className="page" style={{ maxWidth:680 }}>
+      <div className="page-head">
+        <div>
+          <div className="h-title">จัดการเมนูเครื่องดื่ม</div>
+          <div className="h-sub">กำหนดรายการเครื่องดื่มที่ผู้เข้าร่วมประชุมสามารถสั่งล่วงหน้าได้</div>
+        </div>
+      </div>
+
+      {toast && (
+        <div className="chip" style={{ background:"var(--green-50)", color:"var(--green)", marginBottom:16, alignSelf:"flex-start" }}>
+          <IcoCheck size={14} /> {toast}
+        </div>
+      )}
+
+      <div className="card" style={{ padding:24, marginBottom:20 }}>
+        <div style={{ fontWeight:600, fontSize:15, marginBottom:14 }}>เพิ่มเมนูใหม่</div>
+        <div className="row" style={{ gap:10 }}>
+          <input className="input" style={{ flex:1 }} placeholder="เช่น ชาเย็น, กาแฟร้อน, น้ำเปล่า"
+            value={newName} onChange={e => { setNewName(e.target.value); setErr(""); }}
+            onKeyDown={e => e.key === "Enter" && addDrink()} />
+          <button className="btn btn-primary" onClick={addDrink} disabled={busy}>
+            <IcoPlus size={17} stroke="#fff" /> เพิ่มเมนู
+          </button>
+        </div>
+        {err && <div className="hint" style={{ color:"var(--red)", marginTop:8 }}>{err}</div>}
+      </div>
+
+      <div className="card" style={{ padding:0, overflow:"hidden" }}>
+        {drinks.length === 0 ? (
+          <div style={{ padding:36, textAlign:"center", color:"var(--muted)" }}>
+            ยังไม่มีเมนูเครื่องดื่ม — เพิ่มเมนูแรกด้านบน
+          </div>
+        ) : (
+          <div>
+            {drinks.map((d, i) => (
+              <div key={d.id} className="row" style={{
+                padding:"14px 20px", gap:12, alignItems:"center",
+                borderBottom: i < drinks.length - 1 ? "1px solid var(--border)" : "none",
+              }}>
+                <IcoCoffee size={18} stroke={d.is_available ? "var(--green)" : "var(--muted)"} style={{ flexShrink:0 }} />
+                <span style={{ flex:1, fontWeight:500, opacity: d.is_available ? 1 : 0.5 }}>{d.name}</span>
+                <button
+                  className={`btn btn-sm ${d.is_available ? "btn-soft" : "btn-soft"}`}
+                  style={{ minWidth:88, color: d.is_available ? "var(--green)" : "var(--muted)" }}
+                  onClick={() => toggleAvail(d)}>
+                  {d.is_available ? <><IcoCheck size={14} /> พร้อมขาย</> : <><IcoX size={14} /> ปิดชั่วคราว</>}
+                </button>
+                <button className="icon-btn" title="ลบ" onClick={() => deleteDrink(d.id)}>
+                  <IcoTrash size={17} stroke="var(--red)" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 /* ===================== CALENDAR ===================== */
 function Calendar({ meetings, onOpen }) {

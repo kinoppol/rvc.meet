@@ -964,8 +964,8 @@ function DrinkOrderSection({ meeting, auth, drinks, onGoLogin, admin }) {
         </div>
       )}
 
-      {/* เมนูว่าง */}
-      {inWindow && auth && avail.length === 0 && (
+      {/* เมนูว่าง — แสดงเสมอเมื่อไม่มีเมนู (ไม่ขึ้นกับ window) */}
+      {avail.length === 0 && (
         <div className="card" style={{ padding:"14px 18px", background:"var(--bg-2)", marginBottom:14 }}>
           <span className="muted">
             ยังไม่มีเมนูเครื่องดื่ม
@@ -975,7 +975,7 @@ function DrinkOrderSection({ meeting, auth, drinks, onGoLogin, admin }) {
       )}
 
       {/* ออเดอร์ของฉัน (สรุป) */}
-      {inWindow && auth && avail.length > 0 && !editing && myOrder && (
+      {(inWindow || admin) && auth && avail.length > 0 && !editing && myOrder && (
         <div className="card" style={{ padding:18, marginBottom:14 }}>
           <div style={{ fontWeight:600, marginBottom:6 }}>ออเดอร์ของคุณ</div>
           <div className="muted" style={{ fontSize:14, marginBottom:4 }}>
@@ -995,7 +995,7 @@ function DrinkOrderSection({ meeting, auth, drinks, onGoLogin, admin }) {
       )}
 
       {/* ฟอร์มสั่ง */}
-      {inWindow && auth && avail.length > 0 && editing && (
+      {(inWindow || admin) && auth && avail.length > 0 && editing && (
         <div className="card" style={{ padding:20, marginBottom:14 }}>
           <div className="field" style={{ marginBottom:14 }}>
             <label style={{ fontWeight:500, fontSize:14, marginBottom:6, display:"block" }}>ชื่อ</label>

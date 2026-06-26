@@ -929,6 +929,8 @@ function DrinkOrderSection({ meeting, auth, drinks, onGoLogin, admin }) {
       <div style={headerStyle}>
         <IcoCoffee size={20} stroke="var(--blue)" /> สั่งเครื่องดื่ม
       </div>
+
+      {/* เงื่อนไขการสั่ง */}
       {condItems.length > 0 && (
         <div className="card" style={{ padding:"12px 16px", marginBottom:14, display:"flex", flexWrap:"wrap", gap:"10px 24px" }}>
           {condItems.map(c => (
@@ -946,34 +948,41 @@ function DrinkOrderSection({ meeting, auth, drinks, onGoLogin, admin }) {
         </div>
       )}
 
+      {/* หมดเวลา */}
       {tooLate && (
-        <div className="card" style={{ padding:"16px 20px", background:"var(--bg-2)" }}>
+        <div className="card" style={{ padding:"14px 18px", background:"var(--bg-2)", marginBottom:14 }}>
           <span className="muted">หมดเวลาสั่งเครื่องดื่มแล้ว</span>
         </div>
       )}
 
+      {/* ต้อง login */}
       {inWindow && !auth && (
-        <div className="card" style={{ padding:"16px 20px" }}>
+        <div className="card" style={{ padding:"14px 18px", marginBottom:14 }}>
           <span className="muted">กรุณา </span>
           <button className="btn btn-soft btn-sm" onClick={onGoLogin}>เข้าสู่ระบบ</button>
           <span className="muted"> เพื่อสั่งเครื่องดื่ม</span>
         </div>
       )}
 
+      {/* เมนูว่าง */}
       {inWindow && auth && avail.length === 0 && (
-        <div className="card" style={{ padding:"16px 20px", background:"var(--bg-2)" }}>
-          <span className="muted">ยังไม่มีเมนูเครื่องดื่มในขณะนี้</span>
+        <div className="card" style={{ padding:"14px 18px", background:"var(--bg-2)", marginBottom:14 }}>
+          <span className="muted">
+            ยังไม่มีเมนูเครื่องดื่ม
+            {admin && <> — ไปที่ <strong>จัดการเมนูเครื่องดื่ม</strong> เพื่อเพิ่มรายการ</>}
+          </span>
         </div>
       )}
 
+      {/* ออเดอร์ของฉัน (สรุป) */}
       {inWindow && auth && avail.length > 0 && !editing && myOrder && (
-        <div className="card" style={{ padding:20 }}>
-          <div style={{ fontWeight:600, marginBottom:8 }}>ออเดอร์ของคุณ</div>
+        <div className="card" style={{ padding:18, marginBottom:14 }}>
+          <div style={{ fontWeight:600, marginBottom:6 }}>ออเดอร์ของคุณ</div>
           <div className="muted" style={{ fontSize:14, marginBottom:4 }}>
             {myOrder.items.map(it => `${it.name} x${it.qty}`).join(", ")}
           </div>
           {myOrder.notes && <div className="muted" style={{ fontSize:13, marginBottom:8 }}>หมายเหตุ: {myOrder.notes}</div>}
-          <div className="row" style={{ gap:10, marginTop:12 }}>
+          <div className="row" style={{ gap:8, marginTop:10 }}>
             <button className="btn btn-soft btn-sm" onClick={() => setEditing(true)} disabled={busy}>
               <IcoPencil size={15} /> แก้ไข
             </button>
@@ -985,8 +994,9 @@ function DrinkOrderSection({ meeting, auth, drinks, onGoLogin, admin }) {
         </div>
       )}
 
+      {/* ฟอร์มสั่ง */}
       {inWindow && auth && avail.length > 0 && editing && (
-        <div className="card" style={{ padding:22 }}>
+        <div className="card" style={{ padding:20, marginBottom:14 }}>
           <div className="field" style={{ marginBottom:14 }}>
             <label style={{ fontWeight:500, fontSize:14, marginBottom:6, display:"block" }}>ชื่อ</label>
             <input className="input" value={name} onChange={e => setName(e.target.value)}
@@ -1031,7 +1041,12 @@ function DrinkOrderSection({ meeting, auth, drinks, onGoLogin, admin }) {
         </div>
       )}
 
-      {admin && <DrinkOrdersPanel meeting={meeting} />}
+      {/* รายการออเดอร์ทั้งหมด (admin เท่านั้น) */}
+      {admin && (
+        <div style={{ marginTop:8 }}>
+          <DrinkOrdersPanel meeting={meeting} />
+        </div>
+      )}
     </div>
   );
 }

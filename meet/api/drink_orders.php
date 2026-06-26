@@ -67,12 +67,8 @@ function handlePost(PDO $db): never
     if (!$meeting) jsonError('Meeting not found', 404);
     if (!$meeting['drinks_enabled']) jsonError('การสั่งเครื่องดื่มไม่ได้เปิดใช้งานสำหรับการประชุมนี้', 403);
 
-    $startTs  = strtotime($meeting['start_time'] . ' UTC');
-    $now      = time();
-    $windowStart = $startTs - 24 * 3600;
-
-    if ($now < $windowStart) jsonError('ยังไม่ถึงเวลาเปิดรับออเดอร์ (เปิด 24 ชั่วโมงก่อนประชุม)', 403);
-    if ($now >= $startTs)    jsonError('หมดเวลาสั่งเครื่องดื่มแล้ว', 403);
+    $startTs = strtotime($meeting['start_time'] . ' UTC');
+    if (time() >= $startTs) jsonError('หมดเวลาสั่งเครื่องดื่มแล้ว', 403);
 
     $userId = $_SESSION['user']['id'] ?? null;
 

@@ -831,9 +831,8 @@ function DrinkOrdersPanel({ meeting }) {
 function DrinkOrderSection({ meeting, auth, drinks, onGoLogin, admin }) {
   const now      = useNow(10000);
   const startTs  = new Date(meeting.start).getTime();
-  const windowStart = startTs - 24 * 60 * 60 * 1000;
-  const inWindow = now.getTime() >= windowStart && now.getTime() < startTs;
-  const tooEarly = now.getTime() < windowStart;
+  const inWindow = now.getTime() < startTs;
+  const tooEarly = false;
   const tooLate  = now.getTime() >= startTs;
 
   const [myOrder,  setMyOrder]  = useStateP(null);   // existing order or null
@@ -913,9 +912,6 @@ function DrinkOrderSection({ meeting, auth, drinks, onGoLogin, admin }) {
   };
 
   const avail = drinks.filter(d => d.is_available);
-  const fmtWindowOpen = new Date(windowStart).toLocaleString("th-TH", {
-    timeZone:"Asia/Bangkok", weekday:"short", day:"numeric", month:"short", hour:"2-digit", minute:"2-digit"
-  });
 
   // Admin sees orders panel (handled in views_admin.jsx via DrinkOrdersPanel)
   // This section renders for non-admin users (and also shows a summary for admin)
@@ -958,12 +954,6 @@ function DrinkOrderSection({ meeting, auth, drinks, onGoLogin, admin }) {
       {toast && (
         <div className="chip" style={{ background:"var(--green-50)", color:"var(--green)", marginBottom:12 }}>
           <IcoCheck size={14} /> {toast}
-        </div>
-      )}
-
-      {tooEarly && (
-        <div className="card" style={{ padding:"16px 20px", background:"var(--bg-2)" }}>
-          <span className="muted">เปิดรับออเดอร์ในวันที่ {fmtWindowOpen} น.</span>
         </div>
       )}
 

@@ -836,7 +836,7 @@ function DrinkOrderSection({ meeting, auth, drinks, onGoLogin, admin }) {
   const tooLate  = now.getTime() >= startTs;
 
   const [myOrder,  setMyOrder]  = useStateP(null);   // existing order or null
-  const [editing,  setEditing]  = useStateP(!admin);  // show form if public
+  const [editing,  setEditing]  = useStateP(true);
   const [qtys,     setQtys]     = useStateP({});       // { drink_id: qty }
   const [name,     setName]     = useStateP(auth?.name ?? "");
   const [notes,    setNotes]    = useStateP("");

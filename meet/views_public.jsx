@@ -835,12 +835,13 @@ function DrinkOrderSection({ meeting, auth, drinks, onGoLogin, admin }) {
   const tooEarly = false;
   const tooLate  = now.getTime() >= startTs;
 
-  const [myOrder,     setMyOrder]     = useStateP(null);
-  const [editing,     setEditing]     = useStateP(true);
-  const [selectedId,  setSelectedId]  = useStateP(null);   // drink_id ที่เลือก
-  const [drinkDetail, setDrinkDetail] = useStateP("");      // รายละเอียดเพิ่มเติม
-  const [name,        setName]        = useStateP(auth?.name ?? "");
-  const [notes,       setNotes]       = useStateP("");
+  const [myOrder,      setMyOrder]      = useStateP(null);
+  const [editing,      setEditing]      = useStateP(true);
+  const [selectedId,   setSelectedId]   = useStateP("");     // drink_id หรือ "other"
+  const [customDrink,  setCustomDrink]  = useStateP("");     // ชื่อเครื่องดื่มกรณี "รายการอื่น ๆ"
+  const [drinkDetail,  setDrinkDetail]  = useStateP("");     // รายละเอียดเพิ่มเติม
+  const [name,         setName]         = useStateP(auth?.name ?? "");
+  const [notes,        setNotes]        = useStateP("");
   const [busy,     setBusy]     = useStateP(false);
   const [err,      setErr]      = useStateP("");
   const [toast,    setToast]    = useStateP("");
@@ -860,8 +861,13 @@ function DrinkOrderSection({ meeting, auth, drinks, onGoLogin, admin }) {
           setName(o.name);
           setNotes(o.notes || "");
           if (o.items.length > 0) {
-            setSelectedId(o.items[0].drink_id);
-            setDrinkDetail(o.items[0].detail || "");
+            const it = o.items[0];
+            if (it.drink_id === 0) {
+              setSelectedId("other"); setCustomDrink(it.name);
+            } else {
+              setSelectedId(it.drink_id);
+            }
+            setDrinkDetail(it.detail || "");
           }
           setEditing(false);
         }
@@ -874,10 +880,11 @@ function DrinkOrderSection({ meeting, auth, drinks, onGoLogin, admin }) {
     if (!auth) { onGoLogin && onGoLogin(); return; }
     const nm = name.trim();
     if (!nm) { setErr("กรุณาระบุชื่อ"); return; }
-    if (!selectedId) { setErr("กรุณาเลือกเครื่องดื่ม 1 รายการ"); return; }
-    const chosen = drinks.find(d => d.id === selectedId);
-    if (!chosen) { setErr("รายการเครื่องดื่มไม่ถูกต้อง"); return; }
-    const items = [{ drink_id: chosen.id, name: chosen.name, qty: 1, detail: drinkDetail.trim() }];
+    if (!selectedId) { setErr("กรุณาเลือกเครื่องดื่ม"); return; }
+    const isOther = selectedId === "other";
+    if (isOther && !customDrink.trim()) { setErr("กรุณาระบุชื่อเครื่องดื่ม"); return; }
+    const chosen = isOther ? null : drinks.find(d => d.id === selectedId);
+    const items  = [{ drink_id: isOther ? 0 : chosen.id, name: isOther ? customDrink.trim() : chosen.name, qty: 1, detail: drinkDetail.trim() }];
     setErr(""); setBusy(true);
     try {
       const res  = await fetch("api/drink_orders.php", {
@@ -903,7 +910,7 @@ function DrinkOrderSection({ meeting, auth, drinks, onGoLogin, admin }) {
       const res  = await fetch(`api/drink_orders.php?id=${myOrder.id}`, { method:"DELETE", credentials:"same-origin" });
       const data = await res.json();
       if (data.success) {
-        setMyOrder(null); setEditing(true); setSelectedId(null); setDrinkDetail(""); setNotes(""); setName(auth?.name ?? "");
+        setMyOrder(null); setEditing(true); setSelectedId(""); setCustomDrink(""); setDrinkDetail(""); setNotes(""); setName(auth?.name ?? "");
         showToast("ยกเลิกออเดอร์แล้ว");
       }
     } catch {}
@@ -1002,28 +1009,28 @@ function DrinkOrderSection({ meeting, auth, drinks, onGoLogin, admin }) {
               placeholder="ชื่อของคุณ" />
           </div>
 
-          <div style={{ marginBottom:14 }}>
-            <div style={{ fontWeight:500, fontSize:14, marginBottom:10 }}>เลือกเครื่องดื่ม <span className="muted" style={{ fontWeight:400 }}>(1 รายการ)</span></div>
-            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-              {avail.map(d => (
-                <label key={d.id} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 14px",
-                  borderRadius:"var(--radius)", border:`1.5px solid ${selectedId===d.id?"var(--blue)":"var(--line)"}`,
-                  background: selectedId===d.id ? "var(--blue-50)" : "var(--bg-2)",
-                  cursor:"pointer", transition:"all .15s" }}>
-                  <input type="radio" name="drink" value={d.id}
-                    checked={selectedId === d.id}
-                    onChange={() => setSelectedId(d.id)}
-                    style={{ accentColor:"var(--blue)", width:16, height:16 }} />
-                  <span style={{ fontSize:14, fontWeight: selectedId===d.id ? 600 : 400 }}>{d.name}</span>
-                </label>
-              ))}
-            </div>
+          <div className="field" style={{ marginBottom:14 }}>
+            <label style={{ fontWeight:500, fontSize:14, marginBottom:6, display:"block" }}>เลือกเครื่องดื่ม</label>
+            <select className="select" value={selectedId}
+              onChange={e => { setSelectedId(e.target.value); setCustomDrink(""); setDrinkDetail(""); }}>
+              <option value="">— กรุณาเลือก —</option>
+              {avail.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+              <option value="other">รายการอื่น ๆ</option>
+            </select>
           </div>
+
+          {selectedId === "other" && (
+            <div className="field" style={{ marginBottom:14 }}>
+              <label style={{ fontWeight:500, fontSize:14, marginBottom:6, display:"block" }}>ระบุชื่อเครื่องดื่ม</label>
+              <input className="input" value={customDrink} onChange={e => setCustomDrink(e.target.value)}
+                placeholder="เช่น กาแฟโบราณ, น้ำผลไม้..." autoFocus />
+            </div>
+          )}
 
           {selectedId && (
             <div className="field" style={{ marginBottom:14 }}>
               <label style={{ fontWeight:500, fontSize:14, marginBottom:6, display:"block" }}>
-                รายละเอียดเพิ่มเติม <span className="muted" style={{ fontWeight:400 }}>(ไม่บังคับ)</span>
+                รายละเอียด <span className="muted" style={{ fontWeight:400 }}>(ไม่บังคับ)</span>
               </label>
               <input className="input" value={drinkDetail} onChange={e => setDrinkDetail(e.target.value)}
                 placeholder="เช่น หวานน้อย, ไม่ใส่น้ำแข็ง, ร้อน" />

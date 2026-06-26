@@ -158,7 +158,10 @@ function formatMeeting(array $m, array $attachments): array
         'platform'    => $m['platform'],
         'link'        => $m['link'],
         'location'       => $m['location'] ?? '',
-        'drinks_enabled' => (bool)($m['drinks_enabled'] ?? false),
-        'attachments'    => $attachments,
+        'drinks_enabled'  => (bool)($m['drinks_enabled'] ?? false),
+        'drink_shop'      => $m['drink_shop']      ?? '',
+        'drink_budget'    => (int)($m['drink_budget'] ?? 0),
+        'drink_max_cups'  => (int)($m['drink_max_cups'] ?? 0),
+        'attachments'     => $attachments,
     ];
 }

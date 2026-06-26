@@ -62,8 +62,9 @@ function handlePost(PDO $db): never
     $db->prepare(
         'INSERT INTO meetings
             (id, title, description, organizer, dept, invitees,
-             start_time, end_time, platform, link, location, drinks_enabled)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)'
+             start_time, end_time, platform, link, location,
+             drinks_enabled, drink_shop, drink_budget, drink_max_cups)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
     )->execute([
         $id,
         trim($d['title']       ?? ''),
@@ -77,6 +78,9 @@ function handlePost(PDO $db): never
         trim($d['link']        ?? ''),
         trim($d['location']    ?? ''),
         empty($d['drinks_enabled']) ? 0 : 1,
+        trim($d['drink_shop']      ?? ''),
+        (int)($d['drink_budget']   ?? 0),
+        (int)($d['drink_max_cups'] ?? 0),
     ]);
 
     insertAttachments($db, $id, $d['attachments'] ?? []);
@@ -93,7 +97,8 @@ function handlePut(PDO $db, string $id): never
     $stmt = $db->prepare(
         'UPDATE meetings SET
             title=?, description=?, organizer=?, dept=?, invitees=?,
-            start_time=?, end_time=?, platform=?, link=?, location=?, drinks_enabled=?
+            start_time=?, end_time=?, platform=?, link=?, location=?,
+            drinks_enabled=?, drink_shop=?, drink_budget=?, drink_max_cups=?
          WHERE id=?'
     );
     $stmt->execute([
@@ -108,6 +113,9 @@ function handlePut(PDO $db, string $id): never
         trim($d['link']        ?? ''),
         trim($d['location']    ?? ''),
         empty($d['drinks_enabled']) ? 0 : 1,
+        trim($d['drink_shop']      ?? ''),
+        (int)($d['drink_budget']   ?? 0),
+        (int)($d['drink_max_cups'] ?? 0),
         $id,
     ]);
 
@@ -169,6 +177,9 @@ function ensureDrinksColumn(PDO $db): void
 {
     try {
         $db->exec("ALTER TABLE meetings ADD COLUMN IF NOT EXISTS drinks_enabled TINYINT(1) NOT NULL DEFAULT 0");
+        $db->exec("ALTER TABLE meetings ADD COLUMN IF NOT EXISTS drink_shop VARCHAR(200) NOT NULL DEFAULT ''");
+        $db->exec("ALTER TABLE meetings ADD COLUMN IF NOT EXISTS drink_budget INT NOT NULL DEFAULT 0");
+        $db->exec("ALTER TABLE meetings ADD COLUMN IF NOT EXISTS drink_max_cups INT NOT NULL DEFAULT 0");
         $db->exec("CREATE TABLE IF NOT EXISTS `drinks` (
             `id`           INT UNSIGNED NOT NULL AUTO_INCREMENT,
             `name`         VARCHAR(200) NOT NULL,

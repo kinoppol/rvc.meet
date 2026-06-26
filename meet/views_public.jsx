@@ -931,11 +931,29 @@ function DrinkOrderSection({ meeting, auth, drinks, onGoLogin, admin }) {
     );
   }
 
+  /* ── เงื่อนไขการสั่ง ── */
+  const condItems = [];
+  if (meeting.drink_shop)     condItems.push({ label:"ร้าน", value: meeting.drink_shop });
+  if (meeting.drink_budget)   condItems.push({ label:"งบต่อแก้ว", value: `${meeting.drink_budget} บาท` });
+  if (meeting.drink_max_cups) condItems.push({ label:"สูงสุดต่อคน", value: `${meeting.drink_max_cups} แก้ว` });
+
+  const maxCups = meeting.drink_max_cups || 99;
+
   return (
     <div style={sectionStyle}>
       <div style={headerStyle}>
         <IcoCoffee size={20} stroke="var(--blue)" /> สั่งเครื่องดื่ม
       </div>
+      {condItems.length > 0 && (
+        <div className="card" style={{ padding:"12px 16px", marginBottom:14, display:"flex", flexWrap:"wrap", gap:"10px 24px" }}>
+          {condItems.map(c => (
+            <span key={c.label} style={{ fontSize:13.5 }}>
+              <span className="muted">{c.label}: </span>
+              <span style={{ fontWeight:600 }}>{c.value}</span>
+            </span>
+          ))}
+        </div>
+      )}
 
       {toast && (
         <div className="chip" style={{ background:"var(--green-50)", color:"var(--green)", marginBottom:12 }}>
@@ -1002,11 +1020,14 @@ function DrinkOrderSection({ meeting, auth, drinks, onGoLogin, admin }) {
               {avail.map(d => (
                 <div key={d.id} className="row" style={{ gap:12, alignItems:"center" }}>
                   <span style={{ flex:1, fontSize:14 }}>{d.name}</span>
-                  <input type="number" min="0" max="10"
+                  <input type="number" min="0" max={maxCups}
                     className="input" style={{ width:72, textAlign:"center" }}
                     value={qtys[d.id] || ""}
                     placeholder="0"
-                    onChange={e => setQty(d.id, e.target.value)} />
+                    onChange={e => {
+                      const v = parseInt(e.target.value) || 0;
+                      setQty(d.id, Math.min(v, maxCups));
+                    }} />
                 </div>
               ))}
             </div>

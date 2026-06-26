@@ -226,6 +226,7 @@ function MeetingForm({ initial, onSave, onCancel }) {
     start: toInputLocal(roundToNext()),
     end:   toInputLocal(new Date(roundToNext().getTime() + 90 * 60000)),
     platform:"meet", link:"", location:"", attachments:[], drinks_enabled: false,
+    drink_shop:"", drink_budget:0, drink_max_cups:0,
   };
   /* แยก dept กับ ชื่อแผนก ออกจากกัน เมื่อโหลดจาก initial */
   const initDept = initial?.dept?.startsWith("section:") ? "section"
@@ -239,7 +240,10 @@ function MeetingForm({ initial, onSave, onCancel }) {
     dept:          initDept,
     start:         initial ? toInputLocal(new Date(initial.start)) : def.start,
     end:           initial ? toInputLocal(new Date(initial.end))   : def.end,
-    drinks_enabled: initial?.drinks_enabled ?? false,
+    drinks_enabled:  initial?.drinks_enabled  ?? false,
+    drink_shop:      initial?.drink_shop      ?? "",
+    drink_budget:    initial?.drink_budget    ?? 0,
+    drink_max_cups:  initial?.drink_max_cups  ?? 0,
   });
   const [sectName,  setSectName]  = useS(initSect);
   const [otherName, setOtherName] = useS(initOther);
@@ -492,20 +496,42 @@ function MeetingForm({ initial, onSave, onCancel }) {
           </div>
         </div>
 
-          <div className="field col-2" style={{ borderTop:"1px solid var(--border)", paddingTop:18, marginTop:4 }}>
+          <div className="field col-2" style={{ borderTop:"1px solid var(--line)", paddingTop:18, marginTop:4 }}>
             <label style={{ fontWeight:600, marginBottom:8, display:"block" }}>ฟีเจอร์เพิ่มเติม</label>
-            <div className="row" style={{ gap:10, alignItems:"center" }}>
+            <div className="row" style={{ gap:10, alignItems:"center", marginBottom: f.drinks_enabled ? 14 : 0 }}>
               <button type="button"
                 className={`btn btn-sm ${f.drinks_enabled ? "btn-primary" : "btn-soft"}`}
-                style={{ minWidth:130 }}
+                style={{ minWidth:160 }}
                 onClick={() => set("drinks_enabled", !f.drinks_enabled)}>
                 {f.drinks_enabled ? <IcoCheck size={15} stroke="#fff" /> : <IcoCoffee size={15} />}
-                {f.drinks_enabled ? " เปิดรับออเดอร์เครื่องดื่ม" : " เปิดรับออเดอร์เครื่องดื่ม"}
+                {" เปิดรับออเดอร์เครื่องดื่ม"}
               </button>
               <span className="hint" style={{ margin:0 }}>
-                {f.drinks_enabled ? "ผู้ใช้จะสั่งเครื่องดื่มล่วงหน้าได้ 24 ชั่วโมงก่อนประชุม" : "ปิดอยู่ — ผู้ใช้จะไม่เห็นแบบฟอร์มสั่งเครื่องดื่ม"}
+                {f.drinks_enabled ? "ผู้ใช้จะสั่งเครื่องดื่มล่วงหน้าได้ 24 ชั่วโมงก่อนประชุม" : "ปิดอยู่"}
               </span>
             </div>
+            {f.drinks_enabled && (
+              <div className="form-grid" style={{ marginTop:0, gap:12 }}>
+                <div className="field col-2">
+                  <label>ชื่อร้าน / แหล่งสั่ง <span className="hint" style={{ fontWeight:400 }}>(ไม่บังคับ)</span></label>
+                  <input className="input" value={f.drink_shop}
+                    onChange={e => set("drink_shop", e.target.value)}
+                    placeholder="เช่น ร้านกาแฟสดมุมตึก, Cafe Amazon สาขา..." />
+                </div>
+                <div className="field">
+                  <label>งบประมาณต่อแก้ว (บาท) <span className="hint" style={{ fontWeight:400 }}>(0 = ไม่ระบุ)</span></label>
+                  <input className="input" type="number" min="0" max="9999" value={f.drink_budget || ""}
+                    placeholder="เช่น 50"
+                    onChange={e => set("drink_budget", parseInt(e.target.value) || 0)} />
+                </div>
+                <div className="field">
+                  <label>จำนวนสูงสุดต่อคน (แก้ว) <span className="hint" style={{ fontWeight:400 }}>(0 = ไม่จำกัด)</span></label>
+                  <input className="input" type="number" min="0" max="99" value={f.drink_max_cups || ""}
+                    placeholder="เช่น 2"
+                    onChange={e => set("drink_max_cups", parseInt(e.target.value) || 0)} />
+                </div>
+              </div>
+            )}
           </div>
 
         <div className="row" style={{ justifyContent:"flex-end", marginTop:26, gap:10 }}>

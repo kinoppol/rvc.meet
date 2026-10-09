@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/google_lib.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -11,6 +12,7 @@ try {
     $db = getDB();
     ensureAttachmentStoredName($db);
     ensureDrinksColumn($db);
+    ensureGoogleEventColumn($db);
     match ($method) {
         'GET'    => handleGet($db),
         'POST'   => handlePost($db),
@@ -63,8 +65,8 @@ function handlePost(PDO $db): never
         'INSERT INTO meetings
             (id, title, description, organizer, dept, invitees,
              start_time, end_time, platform, link, location,
-             drinks_enabled, drink_shop, drink_budget, drink_max_cups)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+             drinks_enabled, drink_shop, drink_budget, drink_max_cups, google_event_id)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
     )->execute([
         $id,
         trim($d['title']       ?? ''),
@@ -81,6 +83,7 @@ function handlePost(PDO $db): never
         trim($d['drink_shop']      ?? ''),
         (int)($d['drink_budget']   ?? 0),
         (int)($d['drink_max_cups'] ?? 0),
+        cleanEventId($d['google_event_id'] ?? null),
     ]);
 
     insertAttachments($db, $id, $d['attachments'] ?? []);
@@ -94,11 +97,17 @@ function handlePut(PDO $db, string $id): never
 
     $d = jsonBody();
 
+    $prev = $db->prepare('SELECT google_event_id FROM meetings WHERE id=?');
+    $prev->execute([$id]);
+    $oldEventId = (string)($prev->fetchColumn() ?: '');
+    $newEventId = cleanEventId($d['google_event_id'] ?? null);
+
     $stmt = $db->prepare(
         'UPDATE meetings SET
             title=?, description=?, organizer=?, dept=?, invitees=?,
             start_time=?, end_time=?, platform=?, link=?, location=?,
-            drinks_enabled=?, drink_shop=?, drink_budget=?, drink_max_cups=?
+            drinks_enabled=?, drink_shop=?, drink_budget=?, drink_max_cups=?,
+            google_event_id=?
          WHERE id=?'
     );
     $stmt->execute([
@@ -116,6 +125,7 @@ function handlePut(PDO $db, string $id): never
         trim($d['drink_shop']      ?? ''),
         (int)($d['drink_budget']   ?? 0),
         (int)($d['drink_max_cups'] ?? 0),
+        $newEventId,
         $id,
     ]);
 
@@ -138,7 +148,21 @@ function handlePut(PDO $db, string $id): never
 
     $db->prepare('DELETE FROM attachments WHERE meeting_id=?')->execute([$id]);
     insertAttachments($db, $id, $d['attachments'] ?? []);
-    jsonOk(fetchMeeting($db, $id));
+
+    /* Sync Google Calendar: ลบ event เดิมถ้าถูกแทนที่ / อัปเดต event ปัจจุบัน */
+    $warning = null;
+    if (googleConnected($db)) {
+        try {
+            if ($oldEventId !== '' && $oldEventId !== $newEventId) googleDeleteEvent($db, $oldEventId);
+            if ($newEventId !== null) googleUpdateEvent($db, $newEventId, $d);
+        } catch (\Throwable $e) {
+            $warning = 'บันทึกแล้ว แต่ซิงก์ Google Calendar ไม่สำเร็จ: ' . $e->getMessage();
+        }
+    }
+
+    $out = fetchMeeting($db, $id);
+    if ($warning) $out['warning'] = $warning;
+    jsonOk($out);
 }
 
 function handleDelete(PDO $db, string $id): never
@@ -156,9 +180,18 @@ function handleDelete(PDO $db, string $id): never
         }
     }
 
+    $ev = $db->prepare('SELECT google_event_id FROM meetings WHERE id=?');
+    $ev->execute([$id]);
+    $eventId = (string)($ev->fetchColumn() ?: '');
+
     $stmt = $db->prepare('DELETE FROM meetings WHERE id=?');
     $stmt->execute([$id]);
     if ($stmt->rowCount() === 0) jsonError('Meeting not found', 404);
+
+    /* ลบ event ใน Google Calendar ด้วย (ไม่บล็อกการลบถ้าล้มเหลว) */
+    if ($eventId !== '' && googleConnected($db)) {
+        try { googleDeleteEvent($db, $eventId); } catch (\Throwable) {}
+    }
 
     jsonOk(['deleted' => $id]);
 }
@@ -201,6 +234,20 @@ function ensureDrinksColumn(PDO $db): void
             CONSTRAINT `fk_dorder_meeting` FOREIGN KEY (`meeting_id`) REFERENCES `meetings`(`id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     } catch (\Throwable) {}
+}
+
+function ensureGoogleEventColumn(PDO $db): void
+{
+    try {
+        $db->exec("ALTER TABLE meetings ADD COLUMN IF NOT EXISTS google_event_id VARCHAR(255) DEFAULT NULL");
+        ensureSettingsTable($db);
+    } catch (\Throwable) {}
+}
+
+function cleanEventId(mixed $v): ?string
+{
+    $v = preg_replace('/[^a-z0-9_]/i', '', (string)($v ?? ''));
+    return $v === '' ? null : $v;
 }
 
 function attRow(array $a): array

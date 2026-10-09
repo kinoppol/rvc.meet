@@ -286,6 +286,43 @@ function MeetingForm({ initial, onSave, onCancel }) {
   const [linkLabel,  setLinkLabel]  = useS("");
   const [linkErr,    setLinkErr]    = useS("");
 
+  /* ── Google Calendar: สร้างลิงก์ Meet อัตโนมัติ ── */
+  const [gStatus,   setGStatus]   = useS(null);
+  const [gCreating, setGCreating] = useS(false);
+  const [gErr,      setGErr]      = useS("");
+  useE(() => {
+    fetch("api/google.php?action=status", { credentials:"same-origin" })
+      .then(r => r.json())
+      .then(d => { if (d.success) setGStatus(d.data); })
+      .catch(() => {});
+  }, []);
+
+  const createGoogleMeet = async () => {
+    setGErr("");
+    if (!f.start || !f.end || new Date(f.end) <= new Date(f.start)) {
+      setGErr("กรุณาระบุวันและเวลาเริ่ม/สิ้นสุดให้ถูกต้องก่อน"); return;
+    }
+    setGCreating(true);
+    try {
+      const res  = await fetch("api/google.php?action=create_meet", {
+        method:"POST", credentials:"same-origin",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({
+          title: f.title.trim(), description: f.description, location: f.location,
+          start: new Date(f.start).toISOString(), end: new Date(f.end).toISOString(),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setF(prev => ({ ...prev, platform:"meet", link:data.data.link, google_event_id:data.data.event_id }));
+        setErrs(prev => ({ ...prev, link: undefined }));
+      } else {
+        setGErr(data.error || "สร้างลิงก์ไม่สำเร็จ");
+      }
+    } catch { setGErr("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"); }
+    finally { setGCreating(false); }
+  };
+
   const pickFile = () => { setUploadErr(""); fileInputRef.current?.click(); };
 
   const onFileChange = async (e) => {
@@ -370,10 +407,29 @@ function MeetingForm({ initial, onSave, onCancel }) {
 
           <div className="field col-2">
             <label>ลิงก์เข้าร่วมประชุม <span className="req">*</span></label>
-            <input className="input" value={f.link}
-              onChange={e => set("link", e.target.value)}
-              placeholder="https://meet.google.com/... หรือ https://zoom.us/j/..." />
+            <div className="row" style={{ gap:8 }}>
+              <input className="input grow" value={f.link}
+                onChange={e => setF(prev => ({ ...prev, link: e.target.value, google_event_id: null }))}
+                placeholder="https://meet.google.com/... หรือ https://zoom.us/j/..." />
+              {gStatus?.connected && (
+                <button type="button" className="btn btn-soft" style={{ whiteSpace:"nowrap" }}
+                  onClick={createGoogleMeet} disabled={gCreating}
+                  title={`สร้าง event ใน Google Calendar (${gStatus.email || "บัญชีที่เชื่อมต่อ"}) พร้อมลิงก์ Google Meet`}>
+                  <IcoVideo size={17} />
+                  {gCreating ? "กำลังสร้าง…" : f.google_event_id ? "สร้างลิงก์ใหม่" : "สร้างลิงก์ Google Meet"}
+                </button>
+              )}
+            </div>
             {errs.link && <span className="hint" style={{ color:"var(--red)" }}>{errs.link}</span>}
+            {gErr && <span className="hint" style={{ color:"var(--red)" }}>{gErr}</span>}
+            {f.google_event_id && (
+              <span className="hint" style={{ color:"var(--green)" }}>
+                <IcoCheckCircle size={13} stroke="var(--green)" /> เชื่อมกับ Google Calendar แล้ว — เมื่อแก้ไขเวลา/หัวข้อหรือลบการประชุม ระบบจะอัปเดตปฏิทินให้อัตโนมัติ
+              </span>
+            )}
+            {gStatus && !gStatus.connected && (
+              <span className="hint">ต้องการสร้างลิงก์ Google Meet อัตโนมัติ? ให้ผู้ดูแลระบบเชื่อมต่อที่เมนู "Google Calendar"</span>
+            )}
             <span className="hint">ลิงก์จะแสดงเป็นสีเทาจนกว่าจะถึงเวลาประชุม และถูกซ่อนภายใน 1 ชั่วโมงหลังการประชุมสิ้นสุด</span>
           </div>
 
@@ -1270,4 +1326,157 @@ function UserModal({ mode, user, currentUser, onSave, onClose }) {
   );
 }
 
-Object.assign(window, { Login, Dashboard, MeetingForm, Calendar, UserManagement, PERM_LABEL });
+/* ===================== GOOGLE CALENDAR SETTINGS ===================== */
+function GoogleSettings({ flash }) {
+  const [st,      setSt]      = useS(null);
+  const [form,    setForm]    = useS({ client_id:"", client_secret:"", calendar_id:"primary" });
+  const [saving,  setSaving]  = useS(false);
+  const [err,     setErr]     = useS(flash?.type === "error" ? flash.msg : "");
+  const [toast,   setToast]   = useS(flash?.type === "connected" ? "เชื่อมต่อบัญชี Google สำเร็จ" : "");
+  const [askOff,  setAskOff]  = useS(false);
+
+  const apply = (d) => {
+    setSt(d);
+    setForm({ client_id: d.client_id || "", client_secret: "", calendar_id: d.calendar_id || "primary" });
+  };
+
+  useE(() => {
+    fetch("api/google.php?action=status", { credentials:"same-origin" })
+      .then(r => r.json())
+      .then(d => { if (d.success) apply(d.data); else setErr(d.error); })
+      .catch(() => setErr("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"));
+  }, []);
+
+  const post = async (action, body) => {
+    setSaving(true); setErr("");
+    try {
+      const res  = await fetch(`api/google.php?action=${action}`, {
+        method:"POST", credentials:"same-origin",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify(body || {}),
+      });
+      const data = await res.json();
+      if (!data.success) { setErr(data.error || "เกิดข้อผิดพลาด"); return false; }
+      apply(data.data);
+      return true;
+    } catch { setErr("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"); return false; }
+    finally { setSaving(false); }
+  };
+
+  const save = async () => { if (await post("config", form)) setToast("บันทึกการตั้งค่าแล้ว"); };
+  const disconnect = async () => { setAskOff(false); if (await post("disconnect")) setToast("ยกเลิกการเชื่อมต่อแล้ว"); };
+  const copy = (t) => navigator.clipboard?.writeText(t).then(() => setToast("คัดลอกแล้ว"));
+
+  if (!st) return <div className="page"><div className="empty"><div>{err || "กำลังโหลด…"}</div></div></div>;
+
+  return (
+    <div className="page" style={{ maxWidth:860 }}>
+      <div className="page-head">
+        <div>
+          <div className="h-title">เชื่อมต่อ Google Calendar</div>
+          <div className="h-sub">สร้างลิงก์ Google Meet และนัดหมายในปฏิทินจากหน้าสร้างการประชุมได้ทันที</div>
+        </div>
+      </div>
+
+      {err && (
+        <div className="card" style={{ padding:"10px 16px", marginBottom:16, borderColor:"var(--red)", color:"var(--red)", fontSize:14 }}>
+          <IcoX size={14} stroke="var(--red)" /> {err}
+        </div>
+      )}
+      {!st.curl_available && (
+        <div className="card" style={{ padding:"10px 16px", marginBottom:16, borderColor:"var(--red)", color:"var(--red)", fontSize:14 }}>
+          PHP cURL extension ยังไม่เปิดใช้งาน — เปิด <code>extension=curl</code> ใน php.ini แล้วรีสตาร์ต Apache
+        </div>
+      )}
+
+      {/* สถานะการเชื่อมต่อ */}
+      <div className="card" style={{ padding:22, marginBottom:18 }}>
+        <div className="row" style={{ flexWrap:"wrap" }}>
+          <span className="pf-ic" style={{ background: st.connected ? "var(--green)" : "var(--muted)", width:40, height:40, borderRadius:10, display:"grid", placeItems:"center" }}>
+            <IcoCalendar size={20} stroke="#fff" />
+          </span>
+          <div className="grow">
+            <div style={{ fontWeight:600, fontSize:16 }}>
+              {st.connected ? "เชื่อมต่อแล้ว" : st.configured ? "ยังไม่ได้เชื่อมต่อบัญชี" : "ยังไม่ได้ตั้งค่า"}
+            </div>
+            <div className="muted" style={{ fontSize:13.5 }}>
+              {st.connected
+                ? <>บัญชี: <b>{st.email || "—"}</b> · ปฏิทิน: {st.calendar_id}</>
+                : "บันทึก Client ID / Secret ด้านล่าง แล้วกดเชื่อมต่อบัญชี Google"}
+            </div>
+          </div>
+          {st.connected ? (
+            <button className="btn btn-soft" onClick={() => setAskOff(true)} disabled={saving}>ยกเลิกการเชื่อมต่อ</button>
+          ) : (
+            <a className="btn btn-primary" href={st.configured ? "api/google.php?action=connect" : undefined}
+               style={{ opacity: st.configured ? 1 : .45, pointerEvents: st.configured ? "auto" : "none" }}>
+              เชื่อมต่อบัญชี Google
+            </a>
+          )}
+        </div>
+      </div>
+
+      {/* OAuth client */}
+      <div className="card" style={{ padding:28 }}>
+        <div className="form-grid">
+          <div className="field col-2">
+            <label>Authorized redirect URI (นำไปใส่ใน Google Cloud Console)</label>
+            <div className="row" style={{ gap:8 }}>
+              <input className="input grow" readOnly value={st.redirect_uri} onFocus={e => e.target.select()} />
+              <button type="button" className="btn btn-soft" onClick={() => copy(st.redirect_uri)}><IcoCopy size={16} /> คัดลอก</button>
+            </div>
+          </div>
+          <div className="field col-2">
+            <label>Client ID <span className="req">*</span></label>
+            <input className="input" value={form.client_id}
+              onChange={e => setForm({ ...form, client_id: e.target.value })}
+              placeholder="xxxxxxxx.apps.googleusercontent.com" />
+          </div>
+          <div className="field">
+            <label>Client Secret {!st.has_secret && <span className="req">*</span>}</label>
+            <input className="input" type="password" autoComplete="new-password" value={form.client_secret}
+              onChange={e => setForm({ ...form, client_secret: e.target.value })}
+              placeholder={st.has_secret ? "•••••••• (เว้นว่างเพื่อใช้ค่าเดิม)" : "GOCSPX-..."} />
+          </div>
+          <div className="field">
+            <label>Calendar ID</label>
+            <input className="input" value={form.calendar_id}
+              onChange={e => setForm({ ...form, calendar_id: e.target.value })}
+              placeholder="primary" />
+            <span className="hint">ใช้ <code>primary</code> สำหรับปฏิทินหลักของบัญชีที่เชื่อมต่อ</span>
+          </div>
+        </div>
+        <div className="row" style={{ justifyContent:"flex-end", marginTop:18 }}>
+          <button className="btn btn-primary" onClick={save} disabled={saving}>
+            {saving ? "กำลังบันทึก…" : "บันทึกการตั้งค่า"}
+          </button>
+        </div>
+
+        <details style={{ marginTop:18, fontSize:14, lineHeight:1.7 }}>
+          <summary style={{ cursor:"pointer", fontWeight:600 }}>วิธีสร้าง OAuth Client ใน Google Cloud</summary>
+          <ol style={{ paddingLeft:20, marginTop:8 }}>
+            <li>เข้า <a href="https://console.cloud.google.com/" target="_blank" rel="noopener">Google Cloud Console</a> → สร้าง/เลือกโปรเจกต์</li>
+            <li>APIs &amp; Services → Library → เปิดใช้ <b>Google Calendar API</b></li>
+            <li>OAuth consent screen → เลือก <b>Internal</b> (ถ้าใช้ Google Workspace ของสถานศึกษา) แล้วกรอกข้อมูลแอป</li>
+            <li>Credentials → Create credentials → <b>OAuth client ID</b> → ประเภท <b>Web application</b></li>
+            <li>ใส่ Redirect URI ด้านบนในช่อง <b>Authorized redirect URIs</b> → Create</li>
+            <li>คัดลอก Client ID / Client Secret มาใส่ที่นี่ → บันทึก → กด "เชื่อมต่อบัญชี Google" แล้วล็อกอินด้วยบัญชีที่ต้องการให้เป็นเจ้าของนัดหมาย</li>
+          </ol>
+        </details>
+      </div>
+
+      {askOff && (
+        <ConfirmModal
+          title="ยกเลิกการเชื่อมต่อ Google"
+          body="ผู้จัดการประชุมจะไม่สามารถสร้างลิงก์ Google Meet อัตโนมัติได้ (ลิงก์และนัดหมายเดิมยังใช้งานได้ตามปกติ)"
+          confirmLabel="ยกเลิกการเชื่อมต่อ" danger
+          onConfirm={disconnect}
+          onCancel={() => setAskOff(false)}
+        />
+      )}
+      <Toast msg={toast} onDone={() => setToast("")} />
+    </div>
+  );
+}
+
+Object.assign(window, { Login, Dashboard, MeetingForm, Calendar, UserManagement, GoogleSettings, PERM_LABEL });

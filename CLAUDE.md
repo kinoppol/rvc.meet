@@ -47,6 +47,8 @@ Browser → meet/index.html
 Browser → meet/api/meetings.php  (REST: GET/POST/PUT/DELETE)
          meet/api/auth.php        (GET=session check / POST=login / DELETE=logout)
          meet/api/users.php       (CRUD, admin-only)
+         meet/api/google.php      (Google Calendar OAuth + create Meet link; helpers in google_lib.php,
+                                   credentials/tokens stored in `app_settings` table)
             └── all require meet/api/config.php
 ```
 

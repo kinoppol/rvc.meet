@@ -162,6 +162,7 @@ function formatMeeting(array $m, array $attachments): array
         'drink_shop'      => $m['drink_shop']      ?? '',
         'drink_budget'    => (int)($m['drink_budget'] ?? 0),
         'drink_max_cups'  => (int)($m['drink_max_cups'] ?? 0),
+        'google_event_id' => $m['google_event_id'] ?? null,
         'attachments'     => $attachments,
     ];
 }

@@ -123,6 +123,7 @@ function Topbar({ auth, expireAt, view, go, onLogout, theme, onCycleTheme }) {
     ...(canManage(auth) ? [["dashboard", "จัดการประชุม", IcoList]] : []),
     ["calendar",  "ปฏิทิน",       IcoGrid],
     ...(isAdmin(auth)   ? [["users",     "จัดการผู้ใช้",  IcoUsers]] : []),
+    ...(isAdmin(auth)   ? [["google",    "Google Calendar", IcoVideo]] : []),
   ];
 
   return (
@@ -221,6 +222,11 @@ function App() {
   const [loading,  setLoading]  = useSt(true);
   const [apiError, setApiError] = useSt(null);
   const [theme,    setTheme]    = useSt(localStorage.getItem('theme') || 'system');
+  /* ผลลัพธ์จาก Google OAuth callback (?google=connected|error&msg=...) */
+  const [googleFlash] = useSt(() => {
+    const q = new URLSearchParams(location.search);
+    return q.get("google") ? { type: q.get("google"), msg: q.get("msg") || "" } : null;
+  });
 
   /* Apply theme + listen for system preference changes */
   useEf(() => {
@@ -255,7 +261,9 @@ function App() {
         if (authRes.success && authRes.data.user) {
           setAuth(authRes.data.user);
           if (authRes.data.expire_at) setExpireAt(authRes.data.expire_at);
+          if (googleFlash && authRes.data.user.permission === 'admin') setView("google");
         }
+        if (googleFlash) history.replaceState(null, "", location.pathname);
         if (meetRes.success) setMeetings(meetRes.data);
         else setApiError("โหลดข้อมูลไม่ได้: " + (meetRes.error ?? ""));
         if (drinksRes.success) setDrinks(drinksRes.data);
@@ -308,7 +316,7 @@ function App() {
             ? prev.map(x => x.id === data.data.id ? data.data : x)
             : [...prev, data.data];
         });
-        showToast(isEdit ? "บันทึกการแก้ไขแล้ว" : "สร้างการประชุมเรียบร้อย");
+        showToast(data.data.warning || (isEdit ? "บันทึกการแก้ไขแล้ว" : "สร้างการประชุมเรียบร้อย"));
         setEditing(null);
         go("dashboard");
       } else {
@@ -347,13 +355,13 @@ function App() {
   useEf(() => {
     if (!auth) {
       // ต้อง login ก่อนเข้า admin views
-      if (["dashboard","calendar","form","users","drinks"].includes(view)) go("login");
+      if (["dashboard","calendar","form","users","drinks","google"].includes(view)) go("login");
     } else if (auth.permission === 'staff') {
       // staff เข้า management pages ไม่ได้
-      if (["dashboard","form","users","drinks"].includes(view)) go("agenda");
+      if (["dashboard","form","users","drinks","google"].includes(view)) go("agenda");
     } else if (!isAdmin(auth)) {
       // organizer เข้าหน้า users ไม่ได้
-      if (["users","drinks"].includes(view)) go("dashboard");
+      if (["users","drinks","google"].includes(view)) go("dashboard");
     }
   }, [auth, view]);
 
@@ -380,6 +388,7 @@ function App() {
       {view === "detail"    && <MeetingDetail meeting={liveSelected} auth={auth} onBack={() => go(canManage(auth) ? "dashboard" : "agenda")} admin={canManage(auth)} onEdit={startEdit} onDelete={askDelete} onGoLogin={() => go("login")} drinks={drinks} />}
       {view === "users"     && isAdmin(auth) && <UserManagement currentUser={auth} />}
       {view === "drinks"    && isAdmin(auth) && <DrinkManager drinks={drinks} onSave={loadDrinks} />}
+      {view === "google"    && isAdmin(auth) && <GoogleSettings flash={googleFlash} />}
 
       {confirm && (
         <ConfirmModal

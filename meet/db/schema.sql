@@ -21,9 +21,12 @@ CREATE TABLE IF NOT EXISTS `users` (
     `role`          VARCHAR(100)  NOT NULL DEFAULT '' COMMENT 'ตำแหน่ง/ฝ่ายงาน',
     `permission`    VARCHAR(20)   NOT NULL DEFAULT 'staff'
                                   COMMENT 'admin | organizer | staff',
+    `oa_user_id`    INT UNSIGNED  NULL DEFAULT NULL COMMENT 'id ผู้ใช้ใน RVC-ONE (SSO / user-sync)',
+    `active`        TINYINT(1)    NOT NULL DEFAULT 1 COMMENT '0 = ถูกระงับ',
     `created_at`    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uq_username` (`username`)
+    UNIQUE KEY `uq_username` (`username`),
+    UNIQUE KEY `uq_oa_user` (`oa_user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ── Meetings ─────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/oa_lib.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -42,15 +43,19 @@ function handleLogin(): never
         /* Auto-migrate: เพิ่ม permission column กรณียังไม่ได้รัน install.php
            หลังอัปเดต ผู้ใช้เดิมทุกคนจะได้รับสิทธิ์ admin (เหมือนก่อนมีระบบ role) */
         ensurePermissionColumn($db);
+        ensureOaUserColumns($db);
 
         $stmt = $db->prepare(
-            'SELECT id, username, password_hash, name, role, permission
+            'SELECT id, username, password_hash, name, role, permission, active
              FROM users WHERE username = ? LIMIT 1'
         );
         $stmt->execute([$username]);
         $user = $stmt->fetch();
 
         if ($user && password_verify($password, $user['password_hash'])) {
+            if ((int)$user['active'] !== 1) {
+                jsonError('บัญชีของคุณถูกระงับการใช้งาน — กรุณาติดต่อผู้ดูแลระบบ', 403);
+            }
             session_regenerate_id(true);
             $_SESSION['user'] = [
                 'id'         => $user['id'],
@@ -93,29 +98,4 @@ function handleLogout(): never
     }
     session_destroy();
     jsonOk(['message' => 'Logged out']);
-}
-
-/* ── Auto-migration ──────────────────────────────────
-   เพิ่ม `permission` column ถ้ายังไม่มี (upgrade path)
-   ผู้ใช้เดิมทั้งหมดจะได้ permission = 'admin' เพราะก่อน
-   มีระบบ role พวกเขาสามารถจัดการทุกอย่างได้อยู่แล้ว    */
-function ensurePermissionColumn(PDO $db): void
-{
-    static $checked = false;
-    if ($checked) return;
-    $checked = true;
-
-    try {
-        // ทดสอบว่า column มีอยู่แล้วหรือไม่
-        $db->query('SELECT permission FROM users LIMIT 0');
-    } catch (PDOException) {
-        // column ไม่มี → เพิ่มและตั้งค่า default ให้ผู้ใช้เดิม
-        $db->exec(
-            "ALTER TABLE `users`
-             ADD COLUMN `permission` VARCHAR(20) NOT NULL DEFAULT 'admin'
-             AFTER `role`"
-        );
-        // ผู้ใช้ใหม่ที่สร้างหลังนี้จะเป็น 'staff' (DEFAULT ใน install.php)
-        // แต่ผู้ใช้เดิมที่ถูก migrate ได้รับ 'admin' ถูกต้องแล้ว
-    }
 }

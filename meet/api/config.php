@@ -19,7 +19,7 @@ date_default_timezone_set('UTC');
 /* ── Session ─────────────────────────────────────────────────────── */
 const REMEMBER_LIFETIME = 365 * 24 * 3600; // 1 ปี (วินาที)
 
-if (session_status() === PHP_SESSION_NONE) {
+if (PHP_SAPI !== 'cli' && session_status() === PHP_SESSION_NONE) {
     /* gc_maxlifetime ต้องใหญ่พอสำหรับ remember-me */
     ini_set('session.gc_maxlifetime', (string)REMEMBER_LIFETIME);
 
@@ -165,4 +165,29 @@ function formatMeeting(array $m, array $attachments): array
         'google_event_id' => $m['google_event_id'] ?? null,
         'attachments'     => $attachments,
     ];
+}
+
+/* ── Auto-migration ──────────────────────────────────
+   เพิ่ม `permission` column ถ้ายังไม่มี (upgrade path)
+   ผู้ใช้เดิมทั้งหมดจะได้ permission = 'admin' เพราะก่อน
+   มีระบบ role พวกเขาสามารถจัดการทุกอย่างได้อยู่แล้ว    */
+function ensurePermissionColumn(PDO $db): void
+{
+    static $checked = false;
+    if ($checked) return;
+    $checked = true;
+
+    try {
+        // ทดสอบว่า column มีอยู่แล้วหรือไม่
+        $db->query('SELECT permission FROM users LIMIT 0');
+    } catch (PDOException) {
+        // column ไม่มี → เพิ่มและตั้งค่า default ให้ผู้ใช้เดิม
+        $db->exec(
+            "ALTER TABLE `users`
+             ADD COLUMN `permission` VARCHAR(20) NOT NULL DEFAULT 'admin'
+             AFTER `role`"
+        );
+        // ผู้ใช้ใหม่ที่สร้างหลังนี้จะเป็น 'staff' (DEFAULT ใน install.php)
+        // แต่ผู้ใช้เดิมที่ถูก migrate ได้รับ 'admin' ถูกต้องแล้ว
+    }
 }

@@ -228,6 +228,9 @@ function App() {
     return q.get("google") ? { type: q.get("google"), msg: q.get("msg") || "" } : null;
   });
 
+  /* ผลลัพธ์จาก RVC-ONE SSO callback (?sso=ok|cancel) */
+  const [ssoFlash] = useSt(() => new URLSearchParams(location.search).get("sso"));
+
   /* Apply theme + listen for system preference changes */
   useEf(() => {
     applyTheme(theme);
@@ -262,8 +265,13 @@ function App() {
           setAuth(authRes.data.user);
           if (authRes.data.expire_at) setExpireAt(authRes.data.expire_at);
           if (googleFlash && authRes.data.user.permission === 'admin') setView("google");
+          if (ssoFlash === "ok") {
+            setView(authRes.data.user.permission === 'staff' ? "agenda" : "dashboard");
+            setToast("เข้าสู่ระบบผ่าน RVC-ONE สำเร็จ");
+          }
         }
-        if (googleFlash) history.replaceState(null, "", location.pathname);
+        if (ssoFlash === "cancel") { setView("login"); setToast("ยกเลิกการเข้าสู่ระบบผ่าน RVC-ONE แล้ว"); }
+        if (googleFlash || ssoFlash) history.replaceState(null, "", location.pathname);
         if (meetRes.success) setMeetings(meetRes.data);
         else setApiError("โหลดข้อมูลไม่ได้: " + (meetRes.error ?? ""));
         if (drinksRes.success) setDrinks(drinksRes.data);

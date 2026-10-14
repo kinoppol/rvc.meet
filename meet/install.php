@@ -71,6 +71,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $canInstall) {
         $pdo->exec("ALTER TABLE `users`
             ADD COLUMN IF NOT EXISTS `permission` VARCHAR(20) NOT NULL DEFAULT 'staff' AFTER `role`");
 
+        /* Upgrade: RVC-ONE SSO / user-sync (oa_user_id = id ผู้ใช้ใน RVC-ONE, active = 0 เมื่อถูกระงับ) */
+        $pdo->exec("ALTER TABLE `users`
+            ADD COLUMN IF NOT EXISTS `oa_user_id` INT UNSIGNED NULL DEFAULT NULL AFTER `permission`,
+            ADD COLUMN IF NOT EXISTS `active` TINYINT(1) NOT NULL DEFAULT 1 AFTER `oa_user_id`");
+        $pdo->exec("ALTER TABLE `users` ADD UNIQUE INDEX IF NOT EXISTS `uq_oa_user` (`oa_user_id`)");
+
         $pdo->exec("CREATE TABLE IF NOT EXISTS `meetings` (
             `id`          VARCHAR(20)   NOT NULL,
             `title`       VARCHAR(500)  NOT NULL,

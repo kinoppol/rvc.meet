@@ -78,6 +78,16 @@ function Login({ onLogin, onBack }) {
           <h2 style={{ fontFamily:"var(--font-display)", fontSize:26, fontWeight:700, margin:"0 0 6px" }}>เข้าสู่ระบบ</h2>
           <p className="muted" style={{ margin:"0 0 24px", fontSize:14.5 }}>สำหรับเจ้าหน้าที่ผู้จัดการประชุมเท่านั้น</p>
 
+          <a className="btn btn-soft btn-lg btn-block" href="api/sso.php?action=login"
+            style={{ textDecoration:"none" }}>
+            <IcoShield size={18} /> ลงชื่อเข้าใช้ผ่านระบบ RVC-ONE
+          </a>
+          <div className="muted" style={{ display:"flex", alignItems:"center", gap:10, margin:"18px 0", fontSize:13 }}>
+            <span style={{ flex:1, height:1, background:"var(--line)" }}></span>
+            หรือใช้ชื่อผู้ใช้ของระบบนี้
+            <span style={{ flex:1, height:1, background:"var(--line)" }}></span>
+          </div>
+
           <form onSubmit={submit} style={{ display:"flex", flexDirection:"column", gap:16 }}>
             <div className="field">
               <label>ชื่อผู้ใช้</label>
@@ -897,6 +907,9 @@ function UserManagement({ currentUser }) {
   const [rmsSyncing, setRmsSyncing] = useS(false);
   const [rmsError,   setRmsError]   = useS("");
   const [rmsModal,   setRmsModal]   = useS(false);  // modal วาง JSON
+  const [oaStatus,   setOaStatus]   = useS(null);
+  const [oaSyncing,  setOaSyncing]  = useS(false);
+  const [oaError,    setOaError]    = useS("");
 
   const reloadUsers = () =>
     fetch("api/users.php", { credentials:"same-origin" })
@@ -908,6 +921,12 @@ function UserManagement({ currentUser }) {
       .then(r => r.json())
       .then(d => { if (d.success) setUsers(d.data); })
       .finally(() => setLoading(false));
+
+    /* โหลดสถานะ RVC-ONE sync ล่าสุด */
+    fetch("api/oa_sync.php", { credentials:"same-origin" })
+      .then(r => r.json())
+      .then(d => { if (d.success) setOaStatus(d.data); })
+      .catch(() => {});
 
     /* โหลดสถานะ RMS sync ล่าสุด */
     fetch("api/rms_sync.php", { credentials:"same-origin" })
@@ -967,6 +986,37 @@ function UserManagement({ currentUser }) {
     }
   };
 
+  /* ซิงค์ผู้ใช้จาก RVC-ONE — full = ดึงทั้งหมดใหม่ */
+  const doOaSync = async (full = false) => {
+    setOaSyncing(true);
+    setOaError("");
+    try {
+      const res  = await fetch("api/oa_sync.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ full }),
+      });
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); }
+      catch { setOaError(`Server ตอบกลับไม่ใช่ JSON (HTTP ${res.status}): ${text.slice(0, 200)}`); return; }
+
+      if (data.success) {
+        setOaStatus(data.data.status);
+        const { added, updated, suspended } = data.data;
+        setToast(`ซิงค์ RVC-ONE สำเร็จ: เพิ่ม ${added} อัพเดต ${updated} ระงับ ${suspended}`);
+        await reloadUsers();
+      } else {
+        setOaError(data.error ?? "เกิดข้อผิดพลาด");
+      }
+    } catch (e) {
+      setOaError("เกิดข้อผิดพลาด: " + e.message);
+    } finally {
+      setOaSyncing(false);
+    }
+  };
+
   const filtered = users.filter(u =>
     q === "" || (u.name + u.username + u.role + PERM_LABEL[u.permission])
       .toLowerCase().includes(q.toLowerCase())
@@ -1014,6 +1064,15 @@ function UserManagement({ currentUser }) {
           <div className="h-sub">บัญชีผู้ใช้ทั้งหมด {users.length} บัญชี</div>
         </div>
         <div className="row" style={{ gap:10, flexWrap:"wrap" }}>
+          <button className="btn btn-soft" onClick={() => doOaSync(false)} disabled={oaSyncing}
+            title="ดึงผู้ใช้ที่เปลี่ยนแปลงตั้งแต่ซิงค์ครั้งล่าสุดจาก RVC-ONE">
+            <IcoShield size={17} />
+            {oaSyncing ? "กำลังซิงค์…" : "ซิงค์ผู้ใช้จาก RVC-ONE"}
+          </button>
+          <button className="btn btn-ghost btn-sm" onClick={() => doOaSync(true)} disabled={oaSyncing}
+            title="ดึงรายชื่อผู้ใช้ทั้งหมดจาก RVC-ONE ใหม่">
+            ซิงค์ทั้งหมดใหม่
+          </button>
           <button className="btn btn-soft" onClick={() => { setRmsError(""); doRmsSync(null, true); }} disabled={rmsSyncing}
             title="โอนข้อมูลบุคลากรจากระบบ RMS">
             <IcoUsers size={17} />
@@ -1029,6 +1088,45 @@ function UserManagement({ currentUser }) {
           </button>
         </div>
       </div>
+
+      {/* RVC-ONE sync status */}
+      {(oaSyncing || oaError || oaStatus?.last || (oaStatus && !oaStatus.configured)) && (
+        <div className="card" style={{
+          padding:"10px 16px", marginBottom:12, fontSize:13,
+          display:"flex", alignItems:"center", gap:10, flexWrap:"wrap",
+          borderColor: oaSyncing ? "var(--blue)" : (oaError || oaStatus?.last?.ok === false) ? "var(--red)" : undefined,
+        }}>
+          <b style={{ fontWeight:600 }}>RVC-ONE</b>
+          {oaSyncing ? (
+            <>
+              <span style={{
+                width:16, height:16, borderRadius:"50%", flexShrink:0,
+                border:"2.5px solid var(--blue)", borderTopColor:"transparent",
+                display:"inline-block", animation:"spin 0.8s linear infinite",
+              }} />
+              <span style={{ color:"var(--blue)", fontWeight:600 }}>กำลังซิงค์ผู้ใช้…</span>
+            </>
+          ) : oaError ? (
+            <><IcoX size={14} stroke="var(--red)" /><span style={{ color:"var(--red)" }}>{oaError}</span></>
+          ) : !oaStatus.configured ? (
+            <span className="muted">ยังไม่ได้ตั้งค่า OA_CLIENT_SECRET บนเซิร์ฟเวอร์ — ยังซิงค์ไม่ได้ (เข้าสู่ระบบผ่าน SSO ใช้งานได้ตามปกติ)</span>
+          ) : oaStatus.last.ok === false ? (
+            <>
+              <IcoX size={14} stroke="var(--red)" />
+              <span style={{ color:"var(--red)" }}>ซิงค์ล่าสุดล้มเหลว ({fmtDateTime(oaStatus.last.finished_at)}): {oaStatus.last.error}</span>
+            </>
+          ) : (
+            <>
+              <IcoCheckCircle size={14} stroke="var(--green)" />
+              <span className="muted">ซิงค์ล่าสุด:</span>
+              <span>{fmtDateTime(oaStatus.last.finished_at)}</span>
+              <span className="muted" style={{ marginLeft:8 }}>
+                {oaStatus.last.full ? "ทั้งหมด" : "เฉพาะที่เปลี่ยน"} · เพิ่ม {oaStatus.last.added ?? 0} · อัพเดต {oaStatus.last.updated ?? 0} · ระงับ {oaStatus.last.suspended ?? 0}
+              </span>
+            </>
+          )}
+        </div>
+      )}
 
       {/* RMS sync status / loading */}
       {(rmsSyncing || rmsStatus?.last_synced_at || rmsError) && (
@@ -1108,6 +1206,8 @@ function UserManagement({ currentUser }) {
                   </div>
                   <div style={{ fontSize:13, color:"var(--muted)", marginTop:2 }}>
                     @{u.username}{u.role ? ` · ${u.role}` : ""}
+                    {u.oa_user_id && <span className="chip" style={{ marginLeft:8, fontSize:11, padding:"1px 8px" }}>RVC-ONE</span>}
+                    {Number(u.active) === 0 && <span className="chip" style={{ marginLeft:6, fontSize:11, padding:"1px 8px", background:"var(--red-50)", color:"var(--red)" }}>ระงับ</span>}
                   </div>
                 </div>
                 <span className="chip" style={{ background:pm.bg, color:pm.color }}>

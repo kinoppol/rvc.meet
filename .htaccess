@@ -1,0 +1,6 @@
+# RVC-ONE SSO — ใช้เมื่อ document root ของเว็บชี้มาที่ราก repo (แอปอยู่ที่ /meet/)
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^web/auth/callback/?$ meet/api/sso.php?action=callback [L,QSA]
+    RewriteRule ^web/auth/login/?$    meet/api/sso.php?action=login    [L,QSA]
+</IfModule>

@@ -49,6 +49,8 @@ Browser → meet/api/meetings.php  (REST: GET/POST/PUT/DELETE)
          meet/api/users.php       (CRUD, admin-only)
          meet/api/google.php      (Google Calendar OAuth + create Meet link; helpers in google_lib.php,
                                    credentials/tokens stored in `app_settings` table)
+         meet/api/sso.php         (RVC-ONE SSO: ?action=login / ?action=callback — browser redirects, not JSON)
+         meet/api/oa_sync.php     (RVC-ONE user-sync, admin-only; cron: php meet/cron/oa_sync.php [--full])
             └── all require meet/api/config.php
 ```
 
@@ -89,7 +91,15 @@ Session-based. `$_SESSION['user']` contains: `id`, `username`, `name`, `role`, `
 | `organizer` | meeting CRUD only |
 | `staff` | view agenda + calendar, click join links (authenticated) |
 
-`auth.php` runs `ensurePermissionColumn()` on every login to auto-migrate older installs that lack the `permission` column.
+### RVC-ONE SSO + user sync
+
+- Config: `api/oa_config.php` (endpoints, client_id, redirect_uri). `OA_CLIENT_SECRET` comes from env or `define()` in `api/db.config.php` — never commit it.
+- Helpers: `api/oa_lib.php` — `oaVerifyToken()`, `oaUpsertUser()` (match by `users.oa_user_id`), `oaSync()` (cursor paging; `since` stored in `app_settings.oa_sync_since` only after all pages succeed).
+- Registered redirect_uri is `https://meet.rvc.ac.th/web/auth/callback` → rewritten to `api/sso.php?action=callback` by `.htaccess` (repo root and `meet/`). `/web/auth/login` starts the flow.
+- RVC-ONE POSTs the callback cross-site, so the SameSite=Lax session cookie is not sent; `sso.php` relays the POST to itself once (`_relay=1`) before opening the session.
+- `users.active = 0` (suspended in RVC-ONE) blocks both password and SSO login. SSO-created users get `password_hash = '!sso'` (no password login).
+
+`ensurePermissionColumn()` (in `config.php`) runs on every login to auto-migrate older installs that lack the `permission` column.
 
 ### Meeting link states
 

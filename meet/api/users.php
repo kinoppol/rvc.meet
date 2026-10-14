@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/oa_lib.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -12,6 +13,7 @@ $id     = (int)($_GET['id'] ?? 0);
 
 try {
     $db = getDB();
+    ensureOaUserColumns($db);
     match ($method) {
         'GET'    => handleGet($db),
         'POST'   => handlePost($db),
@@ -28,7 +30,7 @@ try {
 function handleGet(PDO $db): never
 {
     $users = $db->query(
-        'SELECT id, username, name, role, permission, created_at
+        'SELECT id, username, name, role, permission, oa_user_id, active, created_at
          FROM users ORDER BY id ASC'
     )->fetchAll();
     jsonOk($users);
@@ -107,7 +109,7 @@ function handleDelete(PDO $db, int $id): never
 function fetchUser(PDO $db, int $id): array
 {
     $stmt = $db->prepare(
-        'SELECT id, username, name, role, permission, created_at FROM users WHERE id = ?'
+        'SELECT id, username, name, role, permission, oa_user_id, active, created_at FROM users WHERE id = ?'
     );
     $stmt->execute([$id]);
     $u = $stmt->fetch();

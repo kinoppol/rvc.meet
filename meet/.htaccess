@@ -1,0 +1,7 @@
+# RVC-ONE SSO — redirect_uri ที่ลงทะเบียนไว้คือ /web/auth/callback
+# (ใช้เมื่อ document root ของเว็บชี้มาที่โฟลเดอร์ meet/ นี้)
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^web/auth/callback/?$ api/sso.php?action=callback [L,QSA]
+    RewriteRule ^web/auth/login/?$    api/sso.php?action=login    [L,QSA]
+</IfModule>

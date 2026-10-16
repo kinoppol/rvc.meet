@@ -137,7 +137,7 @@ function handleCreateMeet(PDO $db): never
 {
     requireRole(['admin', 'organizer']);
     if (!googleConnected($db)) {
-        jsonError('ยังไม่ได้เชื่อมต่อ Google Calendar — กรุณาให้ผู้ดูแลระบบตั้งค่าที่เมนู "Google Calendar"', 409);
+        jsonError('ยังไม่ได้เชื่อมต่อ Google Calendar — กรุณาให้ผู้ดูแลระบบตั้งค่าที่เมนู "ตั้งค่า → Google Calendar"', 409);
     }
     $d = jsonBody();
     foreach (['start', 'end'] as $k) {

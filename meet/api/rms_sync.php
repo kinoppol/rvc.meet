@@ -19,6 +19,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 try {
     $db = getDB();
     ensureRmsSyncTable($db);
+    ensureSettingsTable($db);
 } catch (\Throwable $e) {
     jsonError('ไม่สามารถเชื่อมต่อฐานข้อมูล: ' . $e->getMessage());
 }
@@ -33,8 +34,30 @@ if ($method === 'GET') {
         'updated'        => (int)($log['updated'] ?? 0),
         'deleted'        => (int)($log['deleted'] ?? 0),
         'skipped'        => (int)($log['skipped'] ?? 0),
-        'interval_sec'   => RMS_AUTO_SYNC_INTERVAL,
-        'rms_url'        => rtrim(RMS_BASE_URL, '/') . '/' . ltrim(RMS_PEOPLE_PATH, '/'),
+        'interval_sec'   => rmsInterval($db),
+        'rms_url'        => rmsPeopleUrl($db),
+        'rms_default'    => rmsDefaultUrl(),
+    ]);
+}
+
+/* ── PUT: บันทึก URL / ช่วงเวลาตรวจสอบของ RMS ── */
+if ($method === 'PUT') {
+    $body = jsonBody();
+    $url  = trim((string)($body['rms_url'] ?? ''));
+    if ($url !== '' && !preg_match('#^https?://.+#i', $url)) {
+        jsonError('URL ต้องขึ้นต้นด้วย http:// หรือ https://', 422);
+    }
+    $interval = (int)($body['interval_sec'] ?? 0);
+    if ($interval !== 0 && $interval < 300) {
+        jsonError('ช่วงเวลาตรวจสอบอัตโนมัติต้องไม่น้อยกว่า 5 นาที', 422);
+    }
+    /* ว่าง / ค่าเท่าค่าเริ่มต้น → ลบออก ใช้ค่าเริ่มต้นจาก rms_config.php */
+    setSetting($db, 'rms_url', $url === '' || $url === rmsDefaultUrl() ? null : $url);
+    setSetting($db, 'rms_interval', $interval === 0 || $interval === RMS_AUTO_SYNC_INTERVAL ? null : (string)$interval);
+    jsonOk([
+        'interval_sec' => rmsInterval($db),
+        'rms_url'      => rmsPeopleUrl($db),
+        'rms_default'  => rmsDefaultUrl(),
     ]);
 }
 
@@ -50,7 +73,7 @@ if ($method === 'POST') {
         $raw     = json_encode($people);
     } else {
         /* fallback: ดึงจาก server (ถ้า server เข้าถึง RMS ได้) */
-        $url = rtrim(RMS_BASE_URL, '/') . '/' . ltrim(RMS_PEOPLE_PATH, '/');
+        $url = rmsPeopleUrl($db);
         [$raw, $fetchErr] = fetchUrl($url);
 
         if ($raw === null) {

@@ -438,7 +438,7 @@ function MeetingForm({ initial, onSave, onCancel }) {
               </span>
             )}
             {gStatus && !gStatus.connected && (
-              <span className="hint">ต้องการสร้างลิงก์ Google Meet อัตโนมัติ? ให้ผู้ดูแลระบบเชื่อมต่อที่เมนู "Google Calendar"</span>
+              <span className="hint">ต้องการสร้างลิงก์ Google Meet อัตโนมัติ? ให้ผู้ดูแลระบบเชื่อมต่อที่เมนู "ตั้งค่า → Google Calendar"</span>
             )}
             <span className="hint">ลิงก์จะแสดงเป็นสีเทาจนกว่าจะถึงเวลาประชุม และถูกซ่อนภายใน 1 ชั่วโมงหลังการประชุมสิ้นสุด</span>
           </div>
@@ -1579,4 +1579,242 @@ function GoogleSettings({ flash }) {
   );
 }
 
-Object.assign(window, { Login, Dashboard, MeetingForm, Calendar, UserManagement, GoogleSettings, PERM_LABEL });
+/* ===================== RMS SETTINGS ===================== */
+function RmsSettings() {
+  const [st,     setSt]     = useS(null);
+  const [url,    setUrl]    = useS("");
+  const [mins,   setMins]   = useS(60);
+  const [saving, setSaving] = useS(false);
+  const [err,    setErr]    = useS("");
+  const [toast,  setToast]  = useS("");
+
+  const apply = (d) => {
+    setSt(prev => ({ ...prev, ...d }));
+    setUrl(d.rms_url || "");
+    setMins(Math.round((d.interval_sec || 3600) / 60));
+  };
+
+  useE(() => {
+    fetch("api/rms_sync.php", { credentials:"same-origin" })
+      .then(r => r.json())
+      .then(d => { if (d.success) apply(d.data); else setErr(d.error); })
+      .catch(() => setErr("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"));
+  }, []);
+
+  const save = async (resetUrl = false) => {
+    setErr("");
+    const u = resetUrl ? "" : url.trim();
+    if (u && !/^https?:\/\/.+/i.test(u)) { setErr("URL ต้องขึ้นต้นด้วย http:// หรือ https://"); return; }
+    if (!(mins >= 5)) { setErr("ช่วงเวลาตรวจสอบอัตโนมัติต้องไม่น้อยกว่า 5 นาที"); return; }
+    setSaving(true);
+    try {
+      const res  = await fetch("api/rms_sync.php", {
+        method:"PUT", credentials:"same-origin",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ rms_url: u, interval_sec: Math.round(mins * 60) }),
+      });
+      const data = await res.json();
+      if (data.success) { apply(data.data); setToast(resetUrl ? "คืนค่า URL เริ่มต้นแล้ว" : "บันทึกการตั้งค่า RMS แล้ว"); }
+      else setErr(data.error || "เกิดข้อผิดพลาด");
+    } catch { setErr("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"); }
+    finally { setSaving(false); }
+  };
+
+  if (!st) return <div className="empty"><div>{err || "กำลังโหลด…"}</div></div>;
+  const isDefault = st.rms_url === st.rms_default;
+
+  return (
+    <div style={{ maxWidth:860 }}>
+      <div className="page-head">
+        <div>
+          <div className="h-title">ระบบ RMS</div>
+          <div className="h-sub">แหล่งข้อมูลบุคลากรสำหรับโอนข้อมูลผู้ใช้เข้าระบบ</div>
+        </div>
+      </div>
+
+      {err && (
+        <div className="card" style={{ padding:"10px 16px", marginBottom:16, borderColor:"var(--red)", color:"var(--red)", fontSize:14 }}>
+          <IcoX size={14} stroke="var(--red)" /> {err}
+        </div>
+      )}
+
+      <div className="card" style={{ padding:28 }}>
+        <div className="form-grid">
+          <div className="field col-2">
+            <label>URL ข้อมูลบุคลากร (People API) <span className="req">*</span></label>
+            <input className="input" value={url} onChange={e => setUrl(e.target.value)}
+              placeholder={st.rms_default} />
+            <span className="hint">
+              {isDefault ? "ใช้ค่าเริ่มต้นของระบบ" : <>ค่าเริ่มต้น: <code style={{ wordBreak:"break-all" }}>{st.rms_default}</code></>}
+              {" · "}ต้องคืนค่าเป็น JSON array ของบุคลากร
+            </span>
+          </div>
+          <div className="field">
+            <label>ตรวจสอบอัตโนมัติทุก (นาที)</label>
+            <input className="input" type="number" min="5" step="5" value={mins}
+              onChange={e => setMins(Number(e.target.value))} />
+            <span className="hint">ระบบจะโอนข้อมูลอัตโนมัติขณะผู้ดูแลเปิดหน้าจัดการผู้ใช้</span>
+          </div>
+          <div className="field">
+            <label>อัพเดตล่าสุด</label>
+            <div style={{ padding:"10px 0" }}>{st.last_synced_at ? fmtDateTime(st.last_synced_at) : "—"}</div>
+          </div>
+        </div>
+        <div className="row" style={{ justifyContent:"flex-end", marginTop:18, flexWrap:"wrap" }}>
+          <a className="btn btn-ghost" href={st.rms_url} target="_blank" rel="noreferrer"><IcoLink size={16} /> ทดสอบเปิด URL</a>
+          {!isDefault && <button className="btn btn-soft" onClick={() => save(true)} disabled={saving}>คืนค่าเริ่มต้น</button>}
+          <button className="btn btn-primary" onClick={() => save(false)} disabled={saving}>
+            {saving ? "กำลังบันทึก…" : "บันทึกการตั้งค่า"}
+          </button>
+        </div>
+      </div>
+      <Toast msg={toast} onDone={() => setToast("")} />
+    </div>
+  );
+}
+
+/* ===================== DATABASE STRUCTURE ===================== */
+function DatabaseSettings() {
+  const [st,      setSt]      = useS(null);
+  const [running, setRunning] = useS(false);
+  const [ask,     setAsk]     = useS(false);
+  const [log,     setLog]     = useS(null);
+  const [err,     setErr]     = useS("");
+
+  const load = () =>
+    fetch("api/schema.php", { credentials:"same-origin" })
+      .then(r => r.json())
+      .then(d => { if (d.success) setSt(d.data); else setErr(d.error); })
+      .catch(() => setErr("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"));
+
+  useE(() => { load(); }, []);
+
+  const migrate = async () => {
+    setAsk(false); setRunning(true); setErr("");
+    try {
+      const res  = await fetch("api/schema.php", { method:"POST", credentials:"same-origin" });
+      const data = await res.json();
+      if (data.success) { setSt(data.data); setLog(data.data.log); }
+      else setErr(data.error || "เกิดข้อผิดพลาด");
+    } catch { setErr("ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"); }
+    finally { setRunning(false); }
+  };
+
+  const fmtSize = (b) => b >= 1048576 ? (b / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB";
+
+  if (!st) return <div className="empty"><div>{err || "กำลังโหลด…"}</div></div>;
+
+  return (
+    <div>
+      <div className="page-head wrap" style={{ justifyContent:"space-between" }}>
+        <div>
+          <div className="h-title">โครงสร้างฐานข้อมูล</div>
+          <div className="h-sub">ฐานข้อมูล <b>{st.database}</b> · {st.version}</div>
+        </div>
+        <div className="row" style={{ gap:10 }}>
+          <button className="btn btn-soft" onClick={load} disabled={running}>ตรวจสอบอีกครั้ง</button>
+          <button className="btn btn-primary" onClick={() => setAsk(true)} disabled={running || st.pending === 0}>
+            <IcoDatabase size={17} stroke="#fff" />
+            {running ? "กำลังปรับโครงสร้าง…" : "ปรับโครงสร้างฐานข้อมูล"}
+          </button>
+        </div>
+      </div>
+
+      <div className="card" style={{
+        padding:"12px 16px", marginBottom:16, fontSize:14, display:"flex", alignItems:"center", gap:10,
+        borderColor: st.pending ? "var(--red)" : "var(--green)",
+      }}>
+        {st.pending
+          ? <><IcoX size={15} stroke="var(--red)" /><span>พบ <b>{st.pending}</b> ตารางที่โครงสร้างไม่ครบ — กด "ปรับโครงสร้างฐานข้อมูล" เพื่อสร้างตาราง/คอลัมน์ที่ขาด (ข้อมูลเดิมไม่ถูกลบ)</span></>
+          : <><IcoCheckCircle size={15} stroke="var(--green)" /><span>โครงสร้างฐานข้อมูลเป็นปัจจุบัน</span></>}
+      </div>
+
+      {err && (
+        <div className="card" style={{ padding:"10px 16px", marginBottom:16, borderColor:"var(--red)", color:"var(--red)", fontSize:14 }}>
+          {err}
+        </div>
+      )}
+
+      {log && (
+        <div className="card" style={{ padding:"12px 16px", marginBottom:16, fontSize:13.5 }}>
+          <b>ผลการปรับโครงสร้าง:</b>{" "}
+          {log.length === 0 ? "ไม่มีรายการที่ต้องเปลี่ยน" : <ul style={{ margin:"6px 0 0", paddingLeft:20 }}>{log.map((l, i) => <li key={i}>{l}</li>)}</ul>}
+        </div>
+      )}
+
+      <div className="card" style={{ overflow:"hidden" }}>
+        {st.tables.map((t, i) => {
+          const ok = t.exists && t.missing_columns.length === 0;
+          return (
+            <div key={t.name} style={{
+              display:"flex", alignItems:"center", gap:14, padding:"13px 20px", flexWrap:"wrap",
+              borderBottom: i < st.tables.length - 1 ? "1px solid var(--line)" : "none",
+            }}>
+              {ok ? <IcoCheckCircle size={18} stroke="var(--green)" /> : <IcoX size={18} stroke="var(--red)" />}
+              <div className="grow">
+                <div style={{ fontWeight:600, fontFamily:"monospace", fontSize:14.5 }}>{t.name}</div>
+                <div style={{ fontSize:12.5, color: ok ? "var(--muted)" : "var(--red)", marginTop:2 }}>
+                  {!t.exists ? "ยังไม่มีตาราง"
+                    : t.missing_columns.length ? "ขาดคอลัมน์: " + t.missing_columns.join(", ")
+                    : `${t.columns} คอลัมน์`}
+                </div>
+              </div>
+              {t.exists && (
+                <span className="muted" style={{ fontSize:13, whiteSpace:"nowrap" }}>
+                  ~{t.rows.toLocaleString()} แถว · {fmtSize(t.size)}
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {st.extra.length > 0 && (
+        <div className="muted" style={{ fontSize:12.5, marginTop:10 }}>
+          ตารางอื่นในฐานข้อมูล (ระบบไม่ได้ใช้): {st.extra.join(", ")}
+        </div>
+      )}
+
+      {ask && (
+        <ConfirmModal
+          title="ปรับโครงสร้างฐานข้อมูล"
+          body="ระบบจะสร้างตารางและเพิ่มคอลัมน์ที่ขาดเท่านั้น ไม่ลบหรือแก้ไขข้อมูลเดิม แนะนำให้สำรองฐานข้อมูลก่อนดำเนินการ"
+          confirmLabel="ดำเนินการ"
+          onConfirm={migrate}
+          onCancel={() => setAsk(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ===================== SETTINGS (tabs) ===================== */
+const SETTINGS_TABS = [
+  ["users",    "ผู้ใช้",            IcoUsers],
+  ["rms",      "ระบบ RMS",         IcoLink],
+  ["google",   "Google Calendar",  IcoCalendar],
+  ["database", "ฐานข้อมูล",         IcoDatabase],
+];
+
+function Settings({ currentUser, initialTab, googleFlash }) {
+  const [tab, setTab] = useS(initialTab || "users");
+  return (
+    <div className="page page-wide">
+      <div className="settings-tabs seg">
+        {SETTINGS_TABS.map(([k, l, Ic]) => (
+          <button key={k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>
+            <Ic size={16} /> {l}
+          </button>
+        ))}
+      </div>
+      <div className="settings-body">
+        {tab === "users"    && <UserManagement currentUser={currentUser} />}
+        {tab === "rms"      && <RmsSettings />}
+        {tab === "google"   && <GoogleSettings flash={googleFlash} />}
+        {tab === "database" && <DatabaseSettings />}
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { Login, Dashboard, MeetingForm, Calendar, UserManagement, GoogleSettings, Settings, PERM_LABEL });

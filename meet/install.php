@@ -54,77 +54,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $canInstall) {
         ));
         $pdo->exec("USE `" . addslashes($cfg['name']) . "`");
 
-        /* 3. Create tables */
-        $pdo->exec("CREATE TABLE IF NOT EXISTS `users` (
-            `id`            INT UNSIGNED  NOT NULL AUTO_INCREMENT,
-            `username`      VARCHAR(100)  NOT NULL,
-            `password_hash` VARCHAR(255)  NOT NULL,
-            `name`          VARCHAR(200)  NOT NULL,
-            `role`          VARCHAR(100)  NOT NULL DEFAULT '',
-            `permission`    VARCHAR(20)   NOT NULL DEFAULT 'staff',
-            `created_at`    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (`id`),
-            UNIQUE KEY `uq_username` (`username`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-
-        /* Upgrade: add permission column to existing installations */
-        $pdo->exec("ALTER TABLE `users`
-            ADD COLUMN IF NOT EXISTS `permission` VARCHAR(20) NOT NULL DEFAULT 'staff' AFTER `role`");
-
-        /* Upgrade: RVC-ONE SSO / user-sync (oa_user_id = id ผู้ใช้ใน RVC-ONE, active = 0 เมื่อถูกระงับ) */
-        $pdo->exec("ALTER TABLE `users`
-            ADD COLUMN IF NOT EXISTS `oa_user_id` INT UNSIGNED NULL DEFAULT NULL AFTER `permission`,
-            ADD COLUMN IF NOT EXISTS `active` TINYINT(1) NOT NULL DEFAULT 1 AFTER `oa_user_id`");
-        $pdo->exec("ALTER TABLE `users` ADD UNIQUE INDEX IF NOT EXISTS `uq_oa_user` (`oa_user_id`)");
-
-        $pdo->exec("CREATE TABLE IF NOT EXISTS `meetings` (
-            `id`          VARCHAR(20)   NOT NULL,
-            `title`       VARCHAR(500)  NOT NULL,
-            `description` TEXT,
-            `organizer`   VARCHAR(200)  NOT NULL,
-            `dept`        VARCHAR(50)   NOT NULL DEFAULT 'exec',
-            `invitees`    TEXT,
-            `start_time`  DATETIME      NOT NULL,
-            `end_time`    DATETIME      NOT NULL,
-            `platform`    VARCHAR(20)   NOT NULL DEFAULT 'meet',
-            `link`        VARCHAR(1000) NOT NULL,
-            `location`    VARCHAR(500)  DEFAULT NULL,
-            `google_event_id` VARCHAR(255) DEFAULT NULL,
-            `created_at`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            `updated_at`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (`id`),
-            KEY `idx_start` (`start_time`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-
-        $pdo->exec("CREATE TABLE IF NOT EXISTS `attachments` (
-            `id`          INT UNSIGNED NOT NULL AUTO_INCREMENT,
-            `meeting_id`  VARCHAR(20)  NOT NULL,
-            `filename`    VARCHAR(500) NOT NULL,
-            `filesize`    VARCHAR(50)  NOT NULL DEFAULT '',
-            `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (`id`),
-            KEY `idx_meeting` (`meeting_id`),
-            CONSTRAINT `fk_att_meeting`
-                FOREIGN KEY (`meeting_id`) REFERENCES `meetings`(`id`)
-                ON DELETE CASCADE ON UPDATE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-
-        $pdo->exec("CREATE TABLE IF NOT EXISTS `attendance` (
-            `id`         INT UNSIGNED  NOT NULL AUTO_INCREMENT,
-            `meeting_id` VARCHAR(20)   NOT NULL,
-            `user_id`    INT UNSIGNED  NULL,
-            `name`       VARCHAR(200)  NOT NULL,
-            `location`   VARCHAR(500)  NOT NULL DEFAULT '',
-            `is_absent`  TINYINT(1)    NOT NULL DEFAULT 0,
-            `notes`      TEXT,
-            `signed_at`  DATETIME      NOT NULL,
-            `added_by`   INT UNSIGNED  NULL,
-            PRIMARY KEY (`id`),
-            KEY `idx_att_meet` (`meeting_id`),
-            CONSTRAINT `fk_attendance_meeting`
-                FOREIGN KEY (`meeting_id`) REFERENCES `meetings`(`id`)
-                ON DELETE CASCADE ON UPDATE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        /* 3. Create / upgrade tables (โครงสร้างกำหนดใน api/schema_lib.php) */
+        require_once __DIR__ . "/api/schema_lib.php";
+        schemaMigrate($pdo);
 
         /* 4. Admin user */
         $hash = password_hash($adm['password'], PASSWORD_BCRYPT, ['cost' => 12]);

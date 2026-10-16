@@ -47,6 +47,8 @@ const IcoCoffee   = (p) => <Ico {...p}><path d="M6 2v2M10 2v2M14 2v2"/><path d="
 const IcoPencil   = (p) => <Ico {...p}><path d="M4 20h4l10.5-10.5a2 2 0 0 0 0-2.8l-1.2-1.2a2 2 0 0 0-2.8 0L4 16v4z"/><path d="M14.5 6.5l3 3"/></Ico>;
 const IcoMoon     = (p) => <Ico {...p}><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></Ico>;
 const IcoMonitor  = (p) => <Ico {...p}><rect x="2" y="3" width="20" height="14" rx="2.5"/><path d="M8 21h8M12 17v4"/></Ico>;
+const IcoSettings = (p) => <Ico {...p}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></Ico>;
+const IcoDatabase = (p) => <Ico {...p}><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></Ico>;
 
 /* ---- Platform brand glyphs ---- */
 const PfMeet = (p) => <Ico {...p}><rect x="2.5" y="7" width="12" height="10" rx="2.5"/><path d="M14.5 10.5l5-3v9l-5-3"/></Ico>;
@@ -69,6 +71,6 @@ Object.assign(window, {
   IcoDownload, IcoPlus, IcoSearch, IcoEdit, IcoTrash, IcoChevL, IcoChevR, IcoChevDown,
   IcoArrowR, IcoCheck, IcoCheckCircle, IcoX, IcoLock, IcoLogout, IcoBuilding, IcoList,
   IcoGrid, IcoBell, IcoSparkle, IcoShield, IcoCopy, IcoEye, IcoClipboard, IcoUserCheck, IcoWalk,
-  IcoMaximize, IcoMinimize, IcoSun, IcoMoon, IcoMonitor, IcoCoffee, IcoPencil,
+  IcoMaximize, IcoMinimize, IcoSun, IcoMoon, IcoMonitor, IcoCoffee, IcoPencil, IcoSettings, IcoDatabase,
   PfMeet, PfZoom, PfWebex, PfTeams, PfOther,
 });

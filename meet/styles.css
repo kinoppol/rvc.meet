@@ -466,6 +466,7 @@ input, select, textarea { font-family: inherit; }
 .seg { display: inline-flex; background: var(--bg-2); border-radius: var(--radius-pill); padding: 4px; gap: 2px; }
 .seg button { border: none; background: transparent; padding: 7px 16px; border-radius: var(--radius-pill); font-size: 13.5px; font-weight: 600; color: var(--muted); }
 .seg button.on { background: #fff; color: var(--ink); box-shadow: var(--shadow-sm); }
+[data-theme="dark"] .seg button.on { background: var(--line); }
 
 /* toast */
 .toast { position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 13px 22px; border-radius: var(--radius-pill); font-size: 14px; font-weight: 500; box-shadow: var(--shadow-lg); z-index: 200; display: flex; align-items: center; gap: 10px; animation: toastin .25s ease; }
@@ -874,3 +875,8 @@ input, select, textarea { font-family: inherit; }
   .join { width: 100%; justify-content: center; }
   .hero h1 { font-size: 30px; }
 }
+
+/* settings page (tabs) */
+.settings-tabs { margin-bottom: 26px; max-width: 100%; overflow-x: auto; }
+.settings-tabs button { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; cursor: pointer; }
+.settings-body > .page { padding: 0; max-width: none; margin: 0; }

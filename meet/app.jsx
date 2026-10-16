@@ -122,8 +122,7 @@ function Topbar({ auth, expireAt, view, go, onLogout, theme, onCycleTheme }) {
     ["agenda",    "วาระวันนี้",    IcoCalendar],
     ...(canManage(auth) ? [["dashboard", "จัดการประชุม", IcoList]] : []),
     ["calendar",  "ปฏิทิน",       IcoGrid],
-    ...(isAdmin(auth)   ? [["users",     "จัดการผู้ใช้",  IcoUsers]] : []),
-    ...(isAdmin(auth)   ? [["google",    "Google Calendar", IcoVideo]] : []),
+    ...(isAdmin(auth)   ? [["settings",  "ตั้งค่า",       IcoSettings]] : []),
   ];
 
   return (
@@ -264,7 +263,7 @@ function App() {
         if (authRes.success && authRes.data.user) {
           setAuth(authRes.data.user);
           if (authRes.data.expire_at) setExpireAt(authRes.data.expire_at);
-          if (googleFlash && authRes.data.user.permission === 'admin') setView("google");
+          if (googleFlash && authRes.data.user.permission === 'admin') setView("settings");
           if (ssoFlash === "ok") {
             setView(authRes.data.user.permission === 'staff' ? "agenda" : "dashboard");
             setToast("เข้าสู่ระบบผ่าน RVC-ONE สำเร็จ");
@@ -363,13 +362,13 @@ function App() {
   useEf(() => {
     if (!auth) {
       // ต้อง login ก่อนเข้า admin views
-      if (["dashboard","calendar","form","users","drinks","google"].includes(view)) go("login");
+      if (["dashboard","calendar","form","settings","drinks"].includes(view)) go("login");
     } else if (auth.permission === 'staff') {
       // staff เข้า management pages ไม่ได้
-      if (["dashboard","form","users","drinks","google"].includes(view)) go("agenda");
+      if (["dashboard","form","settings","drinks"].includes(view)) go("agenda");
     } else if (!isAdmin(auth)) {
-      // organizer เข้าหน้า users ไม่ได้
-      if (["users","drinks","google"].includes(view)) go("dashboard");
+      // organizer เข้าหน้าตั้งค่าไม่ได้
+      if (["settings","drinks"].includes(view)) go("dashboard");
     }
   }, [auth, view]);
 
@@ -394,9 +393,8 @@ function App() {
       {view === "calendar"  && auth && <Calendar meetings={meetings} onOpen={openDetail} />}
       {view === "form"      && canManage(auth) && <MeetingForm initial={editing} onSave={saveMeeting} onCancel={() => go("dashboard")} />}
       {view === "detail"    && <MeetingDetail meeting={liveSelected} auth={auth} onBack={() => go(canManage(auth) ? "dashboard" : "agenda")} admin={canManage(auth)} onEdit={startEdit} onDelete={askDelete} onGoLogin={() => go("login")} drinks={drinks} />}
-      {view === "users"     && isAdmin(auth) && <UserManagement currentUser={auth} />}
       {view === "drinks"    && isAdmin(auth) && <DrinkManager drinks={drinks} onSave={loadDrinks} />}
-      {view === "google"    && isAdmin(auth) && <GoogleSettings flash={googleFlash} />}
+      {view === "settings"  && isAdmin(auth) && <Settings currentUser={auth} initialTab={googleFlash ? "google" : "users"} googleFlash={googleFlash} />}
 
       {confirm && (
         <ConfirmModal

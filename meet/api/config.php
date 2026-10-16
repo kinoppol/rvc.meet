@@ -123,6 +123,36 @@ function requireRole(array $roles): void
     }
 }
 
+/* ── Settings store (key/value) ──────────────────────────────── */
+
+function ensureSettingsTable(PDO $db): void
+{
+    $db->exec("CREATE TABLE IF NOT EXISTS `app_settings` (
+        `k`          VARCHAR(64) NOT NULL,
+        `v`          TEXT,
+        `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (`k`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+}
+
+function getSetting(PDO $db, string $key, string $default = ''): string
+{
+    $stmt = $db->prepare('SELECT v FROM app_settings WHERE k=?');
+    $stmt->execute([$key]);
+    $v = $stmt->fetchColumn();
+    return $v === false || $v === null ? $default : (string)$v;
+}
+
+function setSetting(PDO $db, string $key, ?string $value): void
+{
+    if ($value === null) {
+        $db->prepare('DELETE FROM app_settings WHERE k=?')->execute([$key]);
+        return;
+    }
+    $db->prepare('INSERT INTO app_settings (k, v) VALUES (?, ?) ON DUPLICATE KEY UPDATE v=VALUES(v)')
+       ->execute([$key, $value]);
+}
+
 /* ── Data helpers ────────────────────────────────────────────────── */
 
 /** Convert any ISO-8601 / datetime string → UTC 'Y-m-d H:i:s' for storage */
